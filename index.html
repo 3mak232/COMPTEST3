@@ -449,7 +449,22 @@ async function usersView(){
   const target=L.find(x=>x.id===permEditorUser);
   const editor=target&&!['admin','developer'].includes(target.role)?`<div class="card"><div class="card-title"><div><b>تخصيص الصلاحيات: ${e(target.name)}</b><div class="muted">الدور الأساسي: ${e(target.role)} · التخصيص هنا يضيّق صلاحيات الدور ولا يوسعها.</div></div><span class="chip ${permEditorMode==='custom'?'warning':'success'}">${permEditorMode==='custom'?'مخصص':'حسب الدور'}</span></div>${PERMISSION_GROUPS.map(([title,items])=>`<div class="perm-group"><h4>${title}</h4><div class="perm-grid">${items.map(([id,label])=>{const allowed=canBaseForRole(target.role,id);const checked=permEditorSet.has(id);return `<label class="perm-item ${allowed?'':'disabled'}"><input type="checkbox" ${checked?'checked':''} ${allowed?'':'disabled'} onchange="togglePerm('${id}',this.checked)"><span>${label}</span>${allowed?'':'<small>خارج الدور</small>'}</label>`}).join('')}</div></div>`).join('')}<div class="row"><button class="btn" onclick="savePermissionEditor()">حفظ التخصيص</button><button class="btn soft" onclick="resetPermissionEditor()">إرجاع لصلاحيات الدور</button></div></div>`:'';
   return `${sectionHead('المستخدمون والصلاحيات','الدور الأساسي يحدد الحد الأعلى، والتخصيص يختار ما يظهر لهذا المستخدم.')}
+  ${me.role==='admin'?addUserCard():''}
   <div class="card">${T(['الاسم','البريد','الدور الأساسي','الوضع','مفعّل','التخصيص'],L.map(u=>[e(u.name),e(u.username),(u.role==='admin'||u.role==='developer')?'<b>admin</b>':`<select ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{role:this.value}))">${(me.isDev?['accountant','sales','store','developer']:['accountant','sales','store']).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}</select>`,chip((u.role==='admin'||u.role==='developer')?'كامل':(u.permissions_mode==='custom'?'مخصص':'حسب الدور'),(u.role==='admin'||u.role==='developer')?'success':u.permissions_mode==='custom'?'warning':'info'),`<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`,(u.role==='admin'||u.role==='developer')?'<span class="muted">صلاحيات المدير كاملة</span>':`<button class="btn soft" onclick="openPermissionEditor('${u.id}')">تخصيص</button>`]))}</div>${editor}`;
+}
+function addUserCard(){
+  const roles=['accountant','sales','store','admin',...(me.isDev?['developer']:[])];
+  return `<div class="card form-card"><div class="card-title"><b>إضافة مستخدم جديد</b><span class="muted">الحساب بيتفعّل فوراً بالدور اللي تختاره</span></div><div class="row"><input id="nu_name" placeholder="الاسم"><input id="nu_email" type="email" placeholder="الإيميل"><input id="nu_pass" type="password" placeholder="كلمة السر (8 حروف على الأقل)"><select id="nu_role">${roles.map(r=>`<option value="${r}">${r}</option>`).join('')}</select><button class="btn" onclick="createAppUser()">إضافة المستخدم</button></div></div>`;
+}
+async function createAppUser(){
+  const name=v('nu_name').trim(), email=v('nu_email').trim(), password=v('nu_pass'), role=v('nu_role');
+  if(!name||!email||password.length<8){toast('أدخل الاسم والإيميل وكلمة سر 8 حروف على الأقل');return}
+  await act(async()=>{
+    const{data,error}=await sb.functions.invoke('admin-create-user',{body:{name,email,password,role}});
+    if(error){let msg=error.message;try{const j=await error.context.json();if(j&&j.error)msg=j.error}catch(_){}throw Error(msg)}
+    if(data&&data.error)throw Error(data.error);
+  });
+  R();
 }
 function canBaseForRole(role,id){return role==='admin'||(Array.isArray(ROLE2[role])&&ROLE2[role].includes(id))}
 
