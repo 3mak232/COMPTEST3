@@ -124,13 +124,12 @@ html,body{overflow-x:hidden}.login-page{min-height:100dvh;width:100%;display:gri
 @media(max-width:780px){.nav-group-title{padding:10px 9px;font-size:11px}.nav-group{margin-top:4px}.nav-group a{min-height:42px;padding:8px 10px}.side-hint{padding-bottom:70px}}
 
 .quickbar{padding:10px 12px;margin-bottom:12px}.quick-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.qa-edit{margin-top:10px;padding-top:10px;border-top:1px solid #0001}
-@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.pg-in{animation:pageIn .3s cubic-bezier(.2,.7,.2,1) both}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pg-in{animation:pageIn .22s ease-out both}
 .sidebar nav button,.sidebtn{transition:background .2s ease,color .2s ease,transform .15s ease}
 .sidebar nav button:active,.sidebtn:active{transform:scale(.98)}
 .btn{transition:transform .15s ease,box-shadow .2s ease,background .2s ease}
 .btn:active{transform:scale(.97)}
-.card{transition:box-shadow .25s ease}
 @media (prefers-reduced-motion:reduce){.pg-in,.btn,.card,.sidebtn{animation:none!important;transition:none!important}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"></head>
@@ -320,13 +319,14 @@ NAV.splice(0,NAV.length,...NAV2);
 const HIDDEN_MODULES=new Set(['mfg','pos','proj']);
 let customPermMode='role',customPerms=new Set();
 const NAV_GROUPS=[
-  ['نظرة عامة',['dash'], 'overview'],
-  ['المبيعات',['sales','quo','ord','dn','cust','ret','comm','price'], 'sales'],
-  ['المشتريات',['purch','po','grn','supp'], 'purch'],
-  ['المخزون',['prod','trf','stk','trace'], 'inventory'],
-  ['المالية',['pay','exp','cash','bank','chk','stmt','jr','asset','taxdoc','rep'], 'finance'],
-  ['الموظفون',['emp','hr','prl'], 'hr'],
-  ['الإعدادات',['set'], 'settings']
+  ['الرئيسية',['dash'],'overview'],
+  ['المبيعات',['sales','ord','quo','dn','ret','cust','price','comm'],'sales'],
+  ['المشتريات',['purch','po','grn','supp'],'purch'],
+  ['المخزون',['prod','trf','stk','trace'],'inventory'],
+  ['الخزينة والبنوك',['cash','bank','chk','pay','exp'],'treasury'],
+  ['المحاسبة والتقارير',['stmt','jr','rep','period','asset','taxdoc'],'accounting'],
+  ['الموظفون',['emp','hr','prl'],'hr'],
+  ['الإدارة',['org','appr','int','users','audit','health','set'],'admin']
 ];
 function visibleNav(id){return !HIDDEN_MODULES.has(id)&&can(id)}
 function renderNavGroups(){
@@ -514,8 +514,9 @@ async function R(q){
   }catch(x){h=`<div class="card error-card"><b>تعذر تحميل الصفحة</b><p>${e(x.message||x)}</p></div>`}
   const links=renderNavGroups();
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
-  if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){const pg=$('.page');$('nav').innerHTML=links;pg.innerHTML=h;pg.classList.remove('pg-in');void pg.offsetWidth;pg.classList.add('pg-in');$('.mobile-bottom').innerHTML=bottomNav()}
-  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div>${me.role==='admin'?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page pg-in">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
+  const viewChanged=window._animView!==view;window._animView=view;
+  if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){const pg=$('.page');$('nav').innerHTML=links;pg.innerHTML=h;if(viewChanged){pg.classList.remove('pg-in');void pg.offsetWidth;pg.classList.add('pg-in')}$('.mobile-bottom').innerHTML=bottomNav()}
+  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div>${me.role==='admin'?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
   if(q){const i=$('#q');if(i){i.focus();i.setSelectionRange(99,99)}}
   updateOnlineStatus();
 }
