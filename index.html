@@ -124,6 +124,14 @@ html,body{overflow-x:hidden}.login-page{min-height:100dvh;width:100%;display:gri
 @media(max-width:780px){.nav-group-title{padding:10px 9px;font-size:11px}.nav-group{margin-top:4px}.nav-group a{min-height:42px;padding:8px 10px}.side-hint{padding-bottom:70px}}
 
 .quickbar{padding:10px 12px;margin-bottom:12px}.quick-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.qa-edit{margin-top:10px;padding-top:10px;border-top:1px solid #0001}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.pg-in{animation:pageIn .3s cubic-bezier(.2,.7,.2,1) both}
+.sidebar nav button,.sidebtn{transition:background .2s ease,color .2s ease,transform .15s ease}
+.sidebar nav button:active,.sidebtn:active{transform:scale(.98)}
+.btn{transition:transform .15s ease,box-shadow .2s ease,background .2s ease}
+.btn:active{transform:scale(.97)}
+.card{transition:box-shadow .25s ease}
+@media (prefers-reduced-motion:reduce){.pg-in,.btn,.card,.sidebtn{animation:none!important;transition:none!important}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"></head>
 <body><div id="app"></div><div id="globalLoader" aria-live="polite"><div class="loader-card"><div class="loader-ring"></div><b id="loaderTitle">جاري التحميل...</b><div class="muted" id="loaderText">من فضلك انتظر</div></div></div><div id="toast" class="toast"></div>
@@ -177,9 +185,11 @@ async function loadAll(soft){
   window._lastLoad=Date.now();
   const finance=me&&(me.role==='admin'||me.role==='accountant');
   const cached=k=>{try{return JSON.parse(localStorage.getItem('erp_cache_'+k)||'null')}catch{return null}};
-  const safe=async(k,fn)=>{try{const x=await fn();localStorage.setItem('erp_cache_'+k,JSON.stringify(x));return x}catch(err){const x=cached(k);if(x)return x;throw err}};
+  const saveCache=!soft||Date.now()-(window._lastCacheWrite||0)>300000;
+  const safe=async(k,fn)=>{try{const x=await fn();if(saveCache)localStorage.setItem('erp_cache_'+k,JSON.stringify(x));return x}catch(err){const x=cached(k);if(x)return x;throw err}};
   const[products,customers,suppliers,warehouses,accts,stock,cb,sbal]=await Promise.all([
     safe('products',()=>g('products','name')),safe('customers',()=>g('customers','name')),safe('suppliers',()=>g('suppliers','name')),safe('warehouses',()=>g('warehouses','name')),finance?safe('cash_accounts',()=>g('cash_accounts','name')):Promise.resolve([]),safe('stock',()=>g('stock_balances')),safe('cb',()=>g('customer_balances')),safe('sbal',()=>g('supplier_balances'))]);
+  if(saveCache)window._lastCacheWrite=Date.now();
   C={products,customers,suppliers,warehouses,accts,stock,cb,sbal};
 }
 function masterForm(kind){const c=kind==='cust',L=c?C.customers:C.suppliers;return `<h2>${c?'العملاء':'الموردون'}</h2><div class="card np"><div class="row"><input id="mn" placeholder="الاسم"><input id="mh" placeholder="الهاتف"><input id="me2" type="email" placeholder="البريد"><input id="ma" placeholder="العنوان"><input id="mt" type="number" placeholder="مدة السداد بالأيام"><input id="mo" type="number" placeholder="رصيد افتتاحي">${c?'<input id="ml" type="number" placeholder="حد الائتمان">':''}<button onclick="act(async()=>ins('${c?'customers':'suppliers'}',{name:v('mn'),phone:v('mh'),email:v('me2'),address:v('ma'),payment_terms_days:n('mt'),opening_balance:n('mo')${c?',credit_limit:n(\'ml\')':''}}))">إضافة</button></div></div><div class="card">${T(['الاسم','الهاتف','البريد','مدة السداد','الرصيد'],L.map(x=>[e(x.name),e(x.phone),e(x.email),x.payment_terms_days||0,fmt(by(c?C.cb:C.sbal,x.id).balance)]))}</div>`}
@@ -504,8 +514,8 @@ async function R(q){
   }catch(x){h=`<div class="card error-card"><b>تعذر تحميل الصفحة</b><p>${e(x.message||x)}</p></div>`}
   const links=renderNavGroups();
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
-  if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){$('nav').innerHTML=links;$('.page').innerHTML=h;$('.mobile-bottom').innerHTML=bottomNav()}
-  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div>${me.role==='admin'?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
+  if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){const pg=$('.page');$('nav').innerHTML=links;pg.innerHTML=h;pg.classList.remove('pg-in');void pg.offsetWidth;pg.classList.add('pg-in');$('.mobile-bottom').innerHTML=bottomNav()}
+  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div>${me.role==='admin'?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page pg-in">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
   if(q){const i=$('#q');if(i){i.focus();i.setSelectionRange(99,99)}}
   updateOnlineStatus();
 }
