@@ -541,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.33';
+const APP_VERSION='v1.34';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -913,6 +913,63 @@ async function printInvoice(id,s){
 .pk-x:hover{color:#c9362b}
 .doc-tbl input[type=number]{font-weight:500}
 @media(max-width:760px){.df input:not([type=hidden]),.df select,.pk input[type=search]{height:44px}}
+/* --- v1.34: شكل الخانات الجديد (ملوّنة ناعمة، بدون حدود تقيلة) --- */
+.doc{overflow:visible;border-color:#e2e8f0;box-shadow:0 1px 2px rgba(16,24,40,.04),0 12px 32px rgba(16,24,40,.06)}
+.doc-toolbar{background:#fff;border-bottom:1px solid #eef2f6;padding:14px 18px;border-radius:14px 14px 0 0}
+.doc-title b{font-size:17px;letter-spacing:-.2px}
+.doc-title span{font-size:12px;color:#64748b;background:#f1f5f9;border-radius:999px;padding:3px 10px;margin-inline-start:12px}
+.doc-btn{border:0;background:#f1f5f9;color:#334155;border-radius:10px;padding:9px 16px;font-weight:700}
+.doc-btn:hover{background:#e2e8f0}
+.doc-btn.primary{background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+.doc-btn.primary:hover{filter:brightness(1.05);box-shadow:0 8px 20px rgba(37,99,235,.34)}
+.doc-head{background:#fbfcfe;padding:20px 20px 18px;gap:18px 16px;border-bottom:1px solid #eef2f6}
+.df{gap:7px;font-size:12px;color:#64748b;font-weight:700}
+.df>span::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#94a3b8;margin-inline-end:7px;vertical-align:middle}
+.df input:not([type=hidden]),.df select,.doc .tl input,.doc-tbl input{width:100%;height:44px;border:1px solid transparent;border-radius:12px;padding:0 14px;background:#eef2f7;color:#0f172a;font-size:14px;font-weight:600;font-family:inherit;transition:background .15s,border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none;box-shadow:none}
+.df input:not([type=hidden]):hover,.df select:hover{background:#e6ecf4}
+.df select{padding-inline-end:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%232563eb' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 14px center;cursor:pointer}
+.df input:not([type=hidden]):focus,.df select:focus,.doc .tl input:focus,.doc-tbl input:focus{outline:none;background:#fff;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.14)}
+.df input[type=number],.doc .tl input,.doc-tbl input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+.df>b,.df>span+b{height:44px;padding:0 14px;border-radius:12px;background:#eef6ff;border:0;color:#1e40af;font-size:14px;font-weight:800;display:flex;align-items:center}
+.df .note{height:auto;padding:12px 14px;background:#fff7ed;color:#9a3412;border:0;font-weight:600;font-size:12px;line-height:1.6}
+.df.wide{grid-column:1/-1}
+.doc-add{padding:16px 20px;background:#fff;border-bottom:1px solid #eef2f6}
+.doc-search input{height:48px;border-radius:999px;padding:0 46px 0 20px;font-size:15px;border:1px solid transparent;background:#f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat right 18px center}
+.doc-search input:focus{background-color:#fff}
+.doc-res{border:0;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.14);padding:6px}
+.doc-res-item{border-radius:10px;border-bottom:0;padding:10px 12px}
+.doc-res-item:hover,.doc-res-item:focus{background:#eff6ff}
+.pk input[type=search]{height:44px;border:1px solid transparent;border-radius:12px;padding:0 14px;background:#eef2f7;color:#0f172a;font-size:14px;font-weight:600}
+.pk input[type=search]:focus{background:#fff;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.14);outline:none}
+.pk-chip{height:44px;border:0;background:linear-gradient(135deg,#eff6ff,#eef2ff);border-radius:12px;padding:0 8px 0 14px}
+.pk-chip b{font-size:14px;color:#0f172a}
+.pk-chip small{color:#4338ca;font-weight:600}
+.pk-x{background:#fff;color:#64748b;box-shadow:none}
+.doc-tbl{border-collapse:separate;border-spacing:0}
+.doc-tbl th{background:#f8fafc;color:#64748b;font-size:11.5px;font-weight:700;letter-spacing:.2px;border-bottom:1px solid #eef2f6;padding:11px 12px}
+.doc-tbl td{border-bottom:1px solid #f1f5f9;padding:8px 12px}
+.doc-tbl tbody tr:hover td{background:#fafcff}
+.doc-tbl td b{font-weight:700;color:#0f172a}
+.doc-tbl td small{font-size:11.5px;color:#94a3b8}
+.doc-tbl .c-n{background:transparent;font-weight:700;color:#94a3b8}
+.doc-tbl input{height:38px;background:transparent;border:1px solid transparent;text-align:center;border-radius:10px}
+.doc-tbl input:hover{background:#f1f5f9}
+.doc-tbl input:focus{background:#fff}
+.doc-tbl .c-t{color:#0f172a;font-size:14px}
+.doc-del{width:30px;height:30px;border-radius:10px;border:0;background:#fef2f2;color:#dc2626;font-size:17px}
+.doc-del:hover{background:#fee2e2}
+.doc-foot{background:#fbfcfe;border-top:1px solid #eef2f6;padding:16px 20px;gap:14px;border-radius:0 0 14px 14px}
+.doc-count{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800;align-self:flex-start}
+.doc-totals{gap:12px}
+.doc .tl{background:#fff;border:0;border-radius:14px;padding:14px 16px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.doc .tl span{color:#64748b;font-weight:700}
+.doc .tl b{font-size:18px;font-weight:800;color:#0f172a}
+.doc .tl input{height:40px;font-weight:800;background:#eef2f7}
+.doc .tl.big{background:linear-gradient(135deg,#2563eb,#4f46e5);box-shadow:0 10px 24px rgba(37,99,235,.3)}
+.doc .tl.big span{color:rgba(255,255,255,.8)}
+.doc .tl.big b{color:#fff;font-size:22px}
+.pk-chip{box-shadow:0 1px 2px rgba(37,99,235,.12)}
+@media(max-width:760px){.df input:not([type=hidden]),.df select,.pk input[type=search],.doc .tl input{height:46px}.doc-totals{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){
   .doc-tbl{min-width:0}
   .doc-tbl thead{display:none}
