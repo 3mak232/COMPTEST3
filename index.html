@@ -487,7 +487,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.44';
+const APP_VERSION='v1.45';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -842,5 +842,532 @@ async function printInvoice(id,s){
     w.document.open(); w.document.write('<p style="font-family:sans-serif;padding:20px">تعذر تحميل الفاتورة: '+e(x.message||x)+'</p>'); w.document.close();
   }
 }
+
+/* =====================================================================
+   v1.45 — تعريفات لاحقة تحل محل القديم (نفس الاسم: الأخيرة هي اللي تسري)
+   ===================================================================== */
+
+// ---------- أدوات مشتركة: أقسام داخل الصفحة ----------
+window._sec=window._sec||{};
+function secCur(key,def){return (window._sec&&window._sec[key])||def}
+function secSet(key,id){window._sec=window._sec||{};window._sec[key]=id;R('soft')}
+function secBar(key,tabs,def){const cur=secCur(key,def);return `<div class="sec-bar">${tabs.map(([id,l])=>`<button type="button" class="sec-btn${cur===id?' on':''}" onclick="secSet('${key}','${id}')">${l}</button>`).join('')}</div>`}
+
+// ---------- أدوات مشتركة: اختيار يوم (اليوم مفتوح، والأيام السابقة مقفولة) ----------
+window._dy=window._dy||{};
+function dyGet(key){return (window._dy&&window._dy[key])||cday(new Date())}
+function dySet(key,d){window._dy=window._dy||{};const t=cday(new Date());window._dy[key]=(!d||d===t)?null:d;R('soft')}
+function dayStrip(key,day,meta){
+  const today=cday(new Date());
+  const btns=[...Array(14)].map((_,i)=>cday(new Date(Date.now()-i*86400000))).map(d=>{
+    const lbl=new Date(d+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',timeZone:'Africa/Cairo'});
+    const m=meta?meta(d):'';
+    return `<button type="button" class="day-btn${d===day?' on':''}" onclick="dySet('${key}','${d}')"><b>${lbl}</b><small>${d===today?'اليوم · مفتوح':'مقفول'}${m?' · '+m:''}</small></button>`;
+  }).join('');
+  return `<div class="card"><div class="card-title"><b>اختر يوم</b><div class="row"><input type="date" value="${day}" onchange="dySet('${key}',this.value)">${day!==today?`<button class="s" onclick="dySet('${key}','')">اليوم</button>`:''}</div></div><div class="day-strip">${btns}</div><p class="muted">اليوم الحالي مفتوح ويتسجل فيه. أي يوم قبله مقفول: للعرض والطباعة فقط.</p></div>`;
+}
+
+// ---------- أدوات مشتركة: الطباعة ----------
+function printHtml(title,body){
+  const w=window.open('','_blank');
+  if(!w){toast('اسمح بالنوافذ المنبثقة عشان تطبع');return null}
+  w.document.open();
+  w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${e(title)}</title><style>@page{size:A4;margin:12mm}body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#101828;margin:0;font-size:13px}h2{margin:0 0 8px;color:#1d4ed8}h3{margin:14px 0 6px}.muted{color:#667085}table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#eef4ff;color:#1d4ed8;padding:7px;text-align:right;font-size:12px}td{padding:7px;border-bottom:1px solid #eaecf0;text-align:right}.tot{font-weight:800;border-top:2px solid #1d4ed8;padding-top:6px}.bad{color:#b42318}.good{color:#067647}.chip{display:inline-block;padding:2px 8px;border-radius:99px;border:1px solid #98a2b3}</style></head><body>${body}<script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script></body></html>`);
+  w.document.close();
+  return w;
+}
+function modalPrint(title){
+  const box=document.querySelector('#modalBg .modal-box');if(!box)return;
+  const c=box.cloneNode(true);
+  c.querySelectorAll('.modal-actions,button,input,select,textarea').forEach(x=>x.remove());
+  printHtml(title||'طباعة',c.innerHTML);
+}
+// جداول قابلة للطباعة: تُخزَّن أولًا ثم تُطبع بزر واحد
+window._PT=window._PT||{};
+function ptStore(key,title,sub,headers,rows,foot){window._PT[key]={title,sub:sub||'',headers,rows,foot:foot||''}}
+function ptPrint(key){
+  const d=window._PT&&window._PT[key];if(!d)return toast('لا توجد بيانات للطباعة');
+  const body=`<h2>${e(d.title)}</h2>${d.sub?`<p class="muted">${d.sub}</p>`:''}<table><thead><tr>${d.headers.map(h=>`<th>${e(h)}</th>`).join('')}</tr></thead><tbody>${d.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="99">لا توجد حركات في هذا اليوم</td></tr>'}</tbody></table>${d.foot}`;
+  printHtml(d.title,body);
+}
+// طباعة جدول قائمة (lsCard) بالكامل بمفتاحه
+function ptPrintLS(key,title,sub){
+  const d=window._LS&&window._LS[key];if(!d)return toast('لا توجد بيانات للطباعة');
+  ptStore('__ls_'+key,title,sub,d.headers,d.rows);
+  ptPrint('__ls_'+key);
+}
+
+// ---------- أدوات مشتركة: نوافذ منبثقة ----------
+function showModal(html,footer){
+  closeModal();
+  const d=document.createElement('div');d.id='modalBg';d.className='modal-bg';
+  d.onclick=ev=>{if(ev.target===d)closeModal()};
+  d.innerHTML=`<div class="modal-box" role="dialog">${html}<div class="modal-actions">${footer||''}<button class="btn s" onclick="closeModal()">إغلاق</button></div></div>`;
+  document.body.appendChild(d);
+}
+function closeModal(){const m=document.getElementById('modalBg');if(m)m.remove();window._trDet=null;window._fmSave=null}
+// نافذة نموذج: تعديل/إضافة. الحفظ يمر بـ act (يعرض الخطأ ويعيد الرسم) ثم يقفل النافذة عند النجاح
+function formModal(title,fields,save,label){
+  window._fmSave=save;
+  showModal(`<div class="card-title"><b>${title}</b></div><div class="fm-grid">${fields}</div>`,`<button class="btn" onclick="fmSave()">${label||'حفظ'}</button>`);
+}
+function fmSave(){const f=window._fmSave;if(!f)return;act(async()=>{await f();closeModal()})}
+async function fnCall(body){
+  const{data,error}=await sb.functions.invoke('admin-create-user',{body});
+  if(error){let msg=error.message;try{const j=await error.context.json();if(j&&j.error)msg=j.error}catch(_){}throw Error(msg)}
+  if(data&&data.error)throw Error(data.error);
+  return data;
+}
+function trPrint(){modalPrint('تفاصيل التحويل')}
+async function trOpen(kind,id){
+  const t=kind==='stk'?'stock_transfers':'cash_transfers';
+  const{data,error}=await sb.from(t).select('*').eq('id',id).single();if(error)return alert(error.message);
+  let items=[];if(kind==='stk'){const r=await sb.from('stock_transfer_items').select('*').eq('transfer_id',id);if(r.error)return alert(r.error.message);items=r.data||[]}
+  const PN=await profNames();
+  window._trDet={kind,row:data,items,by:PN[data.created_by]||'—'};
+  showModal(trDetHtml(kind),`<button class="btn soft" onclick="trPrint()">طباعة</button>`);
+}
+
+// ---------- المنتجات: التعديل في نافذة ----------
+function prodEdit(id){
+  const p=by(C.products,id);if(!p.id)return;
+  formModal('تعديل الصنف: '+e(p.name),
+    `<label class="fm-f"><span>الاسم</span><input id="ep_n" value="${e(p.name)}"></label><label class="fm-f"><span>الكود</span><input id="ep_c" value="${e(p.code||'')}"></label><label class="fm-f"><span>الباركود</span><input id="ep_b" value="${e(p.barcode||'')}"></label><label class="fm-f"><span>سعر الشراء</span><input id="ep_p" type="number" value="${p.purchase_price||0}"></label><label class="fm-f"><span>سعر البيع</span><input id="ep_s" type="number" value="${p.sale_price||0}"></label><label class="fm-f"><span>سعر الجملة</span><input id="ep_w" type="number" value="${p.wholesale_price||0}"></label><label class="fm-f"><span>حد إعادة الطلب</span><input id="ep_m" type="number" value="${p.min_stock||0}"></label>`,
+    async()=>{const nm=v('ep_n').trim();if(!nm)throw Error('اكتب اسم الصنف');if(dupProdName(nm,id))throw Error('يوجد صنف آخر بنفس الاسم');await upd('products',id,{name:nm,code:v('ep_c')||null,barcode:v('ep_b')||null,purchase_price:n('ep_p'),sale_price:n('ep_s'),wholesale_price:n('ep_w'),min_stock:n('ep_m')})},
+    'حفظ التعديل');
+}
+function productsView(){
+  const canM=canMaster();
+  const addCard=canM?`<div class="card np"><div class="row"><input id="pn" placeholder="الاسم"><input id="pc" placeholder="الكود"><input id="pbc" placeholder="باركود"><input id="pp" type="number" placeholder="شراء"><input id="ps" type="number" placeholder="بيع"><input id="pw" type="number" placeholder="جملة"><input id="pm" type="number" placeholder="حد إعادة الطلب"><input id="prq" type="number" placeholder="كمية إعادة الطلب"><input id="pq" type="number" placeholder="الرصيد الافتتاحي (اختياري)"><select id="pwh">${O(C.warehouses)}</select><button onclick="act(async()=>{if(dupProdName(v('pn')))throw Error('يوجد صنف بنفس الاسم بالفعل — عدّل الصنف الموجود بدل إضافة نسخة جديدة');const p=await ins('products',{name:v('pn'),code:v('pc')||null,barcode:v('pbc')||null,purchase_price:n('pp'),sale_price:n('ps'),wholesale_price:n('pw'),min_stock:n('pm'),reorder_qty:n('prq'),avg_cost:n('pp')});if(n('pq')>0)await rpc('set_opening_stock',{p_prod:p.id,p_wh:v('pwh'),p_qty:n('pq')})})">إضافة</button></div><p class="muted">الرصيد الافتتاحي = الكمية الموجودة فعلًا في المخزن المختار وقت بدء استخدام النظام لهذا الصنف. يُسجَّل مرة واحدة فقط.</p></div>`:`<div class="card np muted">عرض فقط — إضافة الأصناف وتعديلها متاحة للإدارة والمحاسب والمخزن.</div>`;
+  const rows=C.products.filter(p=>!window._q||[p.name,p.code,p.barcode].join(' ').includes(window._q)).map(p=>[e(p.code),e(p.name),e(p.barcode),fmt(p.avg_cost),fmt(p.sale_price),`<span class="${stkQty(p.id)<=p.min_stock?'bad':''}">${stkQty(p.id)}</span>`,p.active?'مفعّل':'معطل',canM?`<div class="row-btns"><button class="s" onclick="prodEdit('${p.id}')">تعديل</button><button class="s" onclick="act(()=>upd('products','${p.id}',{active:${!p.active}}))">${p.active?'تعطيل':'تفعيل'}</button></div>`:'']);
+  return `${addCard}<div class="card"><input id="q" placeholder="بحث" value="${e(window._q||'')}" oninput="qSearch(this)">${T(['الكود','الاسم','الباركود','التكلفة','بيع','المخزون','الحالة',''],rows)}</div>`;
+}
+
+// ---------- العملاء والموردون: التعديل في نافذة ----------
+function mEdit(kind,id){
+  const c=kind==='cust',tbl=c?'customers':'suppliers',x=by(c?C.customers:C.suppliers,id);if(!x.id)return;
+  formModal('تعديل: '+e(x.name),
+    `<label class="fm-f"><span>الاسم</span><input id="me_n" value="${e(x.name)}"></label><label class="fm-f"><span>الهاتف</span><input id="me_h" value="${e(x.phone||'')}"></label><label class="fm-f"><span>البريد</span><input id="me_e" type="email" value="${e(x.email||'')}"></label><label class="fm-f"><span>العنوان</span><input id="me_a" value="${e(x.address||'')}"></label><label class="fm-f"><span>مدة السداد (يوم)</span><input id="me_t" type="number" value="${x.payment_terms_days||0}"></label>${c?`<label class="fm-f"><span>حد الائتمان</span><input id="me_l" type="number" value="${x.credit_limit||0}"></label>`:''}`,
+    async()=>{const nm=v('me_n').trim();if(!nm)throw Error('اكتب الاسم');const o={name:nm,phone:v('me_h')||null,email:v('me_e')||null,address:v('me_a')||null,payment_terms_days:n('me_t')};if(c)o.credit_limit=n('me_l');await upd(tbl,id,o)},
+    'حفظ التعديل');
+}
+function masterForm(kind){
+  const c=kind==='cust',tbl=c?'customers':'suppliers',L0=c?C.customers:C.suppliers,q=(window._mq||'').trim(),L=q?L0.filter(x=>[x.name,x.phone,x.email].join(' ').includes(q)):L0;
+  const canEd=isAdminRole()||(!c&&me.role==='accountant');
+  const acts=x=>{let h='';if(canEd)h+=`<button class="s" onclick="mEdit('${kind}','${x.id}')">تعديل</button> <button class="s" onclick="act(()=>upd('${tbl}','${x.id}',{active:${!x.active}}))">${x.active?'تعطيل':'تفعيل'}</button>`;if(c&&isAdminRole())h+=` <button class="danger" onclick="delParty('customers','${x.id}')">حذف</button>`;return h};
+  const add=`<div class="row"><input id="mn" placeholder="الاسم"><input id="mh" placeholder="الهاتف"><input id="me2" type="email" placeholder="البريد"><input id="ma" placeholder="العنوان"><input id="mt" type="number" placeholder="مدة السداد بالأيام"><input id="mo" type="number" placeholder="رصيد افتتاحي">${c?'<input id="ml" type="number" placeholder="حد الائتمان">':''}<button onclick="act(async()=>ins('${tbl}',{name:v('mn'),phone:v('mh'),email:v('me2'),address:v('ma'),payment_terms_days:n('mt'),opening_balance:n('mo')${c?",credit_limit:n('ml')":''}}))">إضافة</button></div>`;
+  return `<h2>${c?'العملاء':'الموردون'}</h2>${canEd?`<div class="card np">${add}</div>`:''}<div class="card np"><input id="mq" placeholder="بحث بالاسم أو الهاتف أو البريد" value="${e(q)}" oninput="mSearch(this)"></div><div class="card">${T(['الاسم','الهاتف','البريد','مدة السداد','الرصيد','الحالة',''],L.map(x=>[e(x.name),e(x.phone),e(x.email),x.payment_terms_days||0,fmt(by(c?C.cb:C.sbal,x.id).balance),x.active?'مفعّل':'معطل',acts(x)]))}</div>`;
+}
+
+// ---------- المخازن: التعديل في نافذة ----------
+async function warehousesView(){
+  const L=await g('warehouses','name');
+  return `${sectionHead('المخازن','إضافة مخزن جديد وتعديل اسمه، أو تعطيله.')}
+  <div class="card np"><div class="row"><input id="wn" placeholder="اسم المخزن"><button onclick="act(async()=>{if(!v('wn').trim())throw Error('أدخل اسم المخزن');await ins('warehouses',{name:v('wn').trim()})})">إضافة مخزن</button></div></div>
+  <div class="card">${T(['المخزن','الحالة',''],L.map(x=>[e(x.name),x.active?'مفعّل':'معطل',`<div class="row-btns"><button class="s" onclick="whEdit('${x.id}')">تعديل</button><button class="s" onclick="act(()=>upd('warehouses','${x.id}',{active:${!x.active}}))">${x.active?'تعطيل':'تفعيل'}</button></div>`]))}</div>`;
+}
+function whEdit(id){
+  const x=by(C.warehouses,id);if(!x.id)return;
+  formModal('تعديل المخزن',`<label class="fm-f"><span>اسم المخزن</span><input id="we_n" value="${e(x.name)}"></label>`,async()=>{const nm=v('we_n').trim();if(!nm)throw Error('أدخل اسم المخزن');await upd('warehouses',id,{name:nm})},'حفظ التعديل');
+}
+
+// ---------- الفواتير: بانر التعديل ----------
+async function invoiceView(s){
+  const k=s?'s':'p', mode=(window.ixMode||{})[k]||'hub', title=s?'المبيعات':'المشتريات';
+  if(mode==='new') return ixBar(k,window._editInv?'تعديل فاتورة '+window._editInv.number:'إنشاء فاتورة جديدة',title)+(window._editInv?`<div class="card np edit-banner"><span>التعديل بيلغي الفاتورة الأصلية <b>${e(window._editInv.number)}</b> ويعمل فاتورة جديدة بالبيانات المعدّلة <b>بنفس تاريخ الفاتورة الأصلية</b>.</span><button class="btn s" onclick="window._editInv=null;cart.s=[];R('soft')">إلغاء التعديل</button></div>`:'')+await invoiceFormView(s);
+  const L=await g(s?'sales_invoice_balances':'purchase_invoice_balances','date');
+  if(mode==='list'||mode==='due') return ixBar(k,mode==='list'?'الفواتير السابقة':'الفواتير المستحقة',title)+ixListCard(k,s,L,mode);
+  return sectionHead(title,'اختار: فاتورة جديدة، أو الفواتير السابقة، أو المستحقات.')+ixHub(k,s,L);
+}
+
+// ---------- التحويل المخزني: بحث عن الصنف بدل القائمة ----------
+function tiSearch(q){
+  const box=document.getElementById('tiRes');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.innerHTML='';return}
+  const list=C.products.filter(p=>p.active&&[p.name,p.code,p.barcode].join(' ').toLowerCase().includes(q)).slice(0,8);
+  box.innerHTML=list.length?list.map(p=>`<button type="button" class="doc-res-item" onclick="tiPick('${p.id}')"><b>${e(p.name)}</b><small>${e(p.code||'بدون كود')} · مخزون المصدر ${v('tf')?stkQtyWh(p.id,v('tf')):stkQty(p.id)}</small></button>`).join(''):'<div class="doc-res-empty">لا توجد أصناف مطابقة</div>';
+}
+function tiPick(id){
+  const p=by(C.products,id);if(!p.id)return;
+  window._tiP=id;
+  const s=document.getElementById('tiSel');if(s)s.innerHTML=`<div class="pk-chip"><div><b>${e(p.name)}</b><small>${e(p.code||'')}</small></div><button type="button" class="pk-x" title="تغيير" onclick="tiClear()">×</button></div>`;
+  const q=document.getElementById('tiQ');if(q){q.value='';q.style.display='none'}
+  const r=document.getElementById('tiRes');if(r)r.innerHTML='';
+  const qt=document.getElementById('tiq');if(qt)qt.focus();
+}
+function tiClear(){
+  window._tiP=null;
+  const s=document.getElementById('tiSel');if(s)s.innerHTML='';
+  const q=document.getElementById('tiQ');if(q){q.style.display='';q.value='';q.focus()}
+}
+function tiAdd(){
+  const p=window._tiP,q=n('tiq');
+  if(!p)return alert('ابحث واختر الصنف أولاً');
+  if(!(q>0))return alert('الكمية لازم تكون أكبر من صفر');
+  const s=cart.t.find(x=>x.product_id===p);if(s)s.qty+=q;else cart.t.push({product_id:p,qty:q});
+  window._tiP=null;R('soft');
+}
+async function transferView(){
+  const cr=cart.t||[];const sp=window._tiP?by(C.products,window._tiP):null;
+  const rowsHtml=cr.map((x,i)=>`<tr><td class="c-n">${i+1}</td><td><b>${e(by(C.products,x.product_id).name)}</b></td><td class="c-q">${x.qty}</td><td class="c-x"><button class="danger" onclick="cart.t.splice(${i},1);R('soft')">حذف</button></td></tr>`).join('');
+  return `<h2>تحويل مخزني</h2>
+  <div class="card tr-card">
+    <div class="tr-route">
+      <label class="tr-f"><span>من مخزن</span><select id="tf">${O(C.warehouses)}</select></label>
+      <div class="tr-arrow" aria-hidden="true">←</div>
+      <label class="tr-f"><span>إلى مخزن</span><select id="tt">${O(C.warehouses)}</select></label>
+    </div>
+    <div class="tr-add">
+      <div class="tr-f grow"><span>ابحث عن الصنف</span><div class="pk"><input id="tiQ" type="search" placeholder="اسم الصنف أو الكود أو الباركود، واضغط Enter" autocomplete="off" style="${sp&&sp.id?'display:none':''}" oninput="tiSearch(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();const b=document.querySelector('#tiRes .doc-res-item');if(b)b.click()}"><div id="tiRes" class="doc-res"></div><div id="tiSel">${sp&&sp.id?`<div class="pk-chip"><div><b>${e(sp.name)}</b><small>${e(sp.code||'')}</small></div><button type="button" class="pk-x" title="تغيير" onclick="tiClear()">×</button></div>`:''}</div></div></div>
+      <label class="tr-f"><span>الكمية</span><input id="tiq" type="number" value="1" inputmode="decimal"></label>
+      <button onclick="tiAdd()">إضافة للتحويل</button>
+    </div>
+    <div class="tr-table">${cr.length?`<table class="doc-tbl"><thead><tr><th class="c-n">#</th><th>الصنف</th><th class="c-q">الكمية</th><th class="c-x"></th></tr></thead><tbody>${rowsHtml}</tbody></table>`:'<div class="tr-empty">لم تُضف أصناف للتحويل بعد.</div>'}</div>
+    <label class="tr-f"><span>ملاحظات</span><textarea id="tn" rows="2" placeholder="اختياري"></textarea></label>
+    <div class="tr-actions"><button onclick="act(async()=>{if(v('tf')===v('tt'))throw Error('اختر مخزنين مختلفين');if(!cart.t.length)throw Error('أضف بندًا');await rpc('create_stock_transfer',{p_from:v('tf'),p_to:v('tt'),p_items:cart.t,p_notes:v('tn')});cart.t=[];window._tiP=null})">حفظ التحويل</button></div>
+  </div>
+  <div class="card">${await stkTransfersHtml()}</div>`;
+}
+
+// ---------- الجرد: جرد جديد / الجرد السابق + تفاصيل ----------
+async function stkDetail(id){
+  const{data,error}=await sb.from('stocktake_items').select('*,products(name)').eq('stocktake_id',id).order('id');
+  if(error)return alert(error.message);
+  const L=data||[];
+  const diffs=L.reduce((a,x)=>a+Math.abs((+x.actual_qty||0)-(+x.expected_qty||0)),0);
+  showModal(`<div class="card-title"><b>تفاصيل الجرد</b><span class="muted">${L.length} صنف · إجمالي الفروقات ${fmt(diffs)}</span></div>${T(['الصنف','المتوقع','الفعلي','الفرق'],L.map(x=>{const d=(+x.actual_qty||0)-(+x.expected_qty||0);return [e((x.products||{}).name||'—'),fmt(x.expected_qty),fmt(x.actual_qty),`<span class="${d<0?'bad':d>0?'good':''}">${d>0?'+':''}${fmt(d)}</span>`]}))}`,`<button class="btn soft" onclick="modalPrint('تفاصيل الجرد')">طباعة</button>`);
+}
+async function stocktakeView(){
+  const sec=secCur('stk','new');
+  const bar=secBar('stk',[['new','جرد جديد'],['hist','الجرد السابق']],'new');
+  const H=await g('stocktakes','date');
+  if(sec==='hist') return sectionHead('الجرد','الجرود السابقة — اضغط تفاصيل لعرض الأصناف والفروقات.')+bar+`<div class="card">${T(['رقم','التاريخ','المخزن','الحالة',''],H.slice().reverse().map(x=>[x.number,x.date,e(by(C.warehouses,x.warehouse_id).name),chip(x.status,x.status==='Approved'?'success':x.status==='Cancelled'?'danger':'warning'),`<button class="s" onclick="stkDetail('${x.id}')">تفاصيل</button>`]))}</div>`;
+  let L=[];
+  if(stk){const{data,error}=await sb.from('stocktake_items').select('*,products(name)').eq('stocktake_id',stk.id).order('id');if(error)throw error;L=data||[]}
+  window._stkL=L;
+  return sectionHead('الجرد','ابدأ جردًا لمخزن، أدخل الكميات الفعلية، ثم اعتمد.')+bar+
+    `<div class="card np"><div class="row"><select id="sw">${O(C.warehouses)}</select><button onclick="act(async()=>{stk={id:await rpc('create_stocktake',{p_warehouse:v('sw')})}})">بدء جرد جديد</button></div></div>`+
+    (stk?`<div class="card"><div class="card-title"><b>الجرد الحالي</b><span class="pill">جرد #${e(stk.id.slice(-6).toUpperCase())}</span></div>${T(['الصنف','المتوقع','الفعلي'],L.map((x,i)=>[e((x.products||{}).name),x.expected_qty,`<input id="sq${i}" type="number" step="0.001" value="${x.actual_qty??x.expected_qty}" style="width:100px">`]))}<button onclick="stkApprove('${stk.id}')">اعتماد الجرد</button></div>`:'<div class="card empty">لا يوجد جرد مفتوح الآن.</div>');
+}
+
+// ---------- المرتجعات: مستند قابل للطباعة + زر الحفظ يعمل ----------
+window._rk=window._rk||'s';
+async function loadRet(){
+  const s=v('rk')==='s',id=v('ri');if(!id)return;
+  const{data,error}=await sb.from(s?'sales_invoice_items':'purchase_invoice_items').select('product_id,qty,unit_price').eq('invoice_id',id);
+  if(error)throw error;
+  const inv=await sb.from(s?'sales_invoices':'purchase_invoices').select('number').eq('id',id).single();
+  RT={s,id,number:(inv.data&&inv.data.number)||'',items:data||[]};
+  R('soft');
+}
+async function retSave(){
+  const cur=RT;if(!cur)return;
+  const items=cur.items.map((x,i)=>({product_id:x.product_id,qty:n('rq'+i)})).filter(x=>x.qty>0);
+  if(!items.length)return alert('اكتب كمية مرتجع لصنف واحد على الأقل');
+  const tbl=cur.s?'sales_returns':'purchase_returns';
+  const beforeRes=await sb.from(tbl).select('id').eq('invoice_id',cur.id);
+  const before=new Set((beforeRes.data||[]).map(x=>x.id));
+  await act(async()=>{await rpc(cur.s?'create_sales_return':'create_purchase_return',{p_invoice:cur.id,p_items:items});RT=null});
+  const afterRes=await sb.from(tbl).select('id').eq('invoice_id',cur.id);
+  const fresh=(afterRes.data||[]).find(x=>!before.has(x.id));
+  if(fresh&&confirm('تم حفظ المرتجع. تطبعه الآن؟'))retPrint(fresh.id,cur.s);
+}
+async function retPrint(id,s){
+  const t=s?'sales':'purchase';
+  const h=await sb.from(t+'_returns').select('*').eq('id',id).single().then(r=>{if(r.error)throw r.error;return r.data});
+  const its=await sb.from(t+'_return_items').select('*,products(name)').eq('return_id',id).then(r=>{if(r.error)throw r.error;return r.data||[]});
+  const co=await g('company_settings').then(x=>x[0]||{});
+  const inv=h.invoice_id?await sb.from(t+'_invoices').select('number,date').eq('id',h.invoice_id).single().then(r=>r.data||{}):{};
+  const party=by(s?C.customers:C.suppliers,s?h.customer_id:h.supplier_id).name||'—';
+  let tot=0;
+  const rowsHtml=its.map((x,i)=>{const pr=Number(x.unit_price??x.price??0),q=Number(x.qty||0),lt=Number(x.line_total??q*pr);tot+=lt;return `<tr><td>${i+1}</td><td>${e(x.products?.name||'')}</td><td>${fmt(q)}</td><td>${fmt(pr)}</td><td>${fmt(lt)}</td></tr>`}).join('');
+  const title=s?'مرتجع مبيعات':'مرتجع مشتريات';
+  printHtml(title+' '+(h.number||''),`<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1d4ed8;padding-bottom:12px"><div><b style="font-size:17px">${e(co.company_name||'')}</b><div class="muted">${e(co.address||'')}${co.tax_number?'<br>الرقم الضريبي: '+e(co.tax_number):''}</div></div><div style="text-align:left"><h2>${title}</h2><div>رقم: <b>${e(h.number||'')}</b></div><div>التاريخ: ${e(h.date||'')}</div>${inv.number?`<div>من الفاتورة: ${e(inv.number)}</div>`:''}</div></div>
+  <p><b>${s?'العميل':'المورد'}:</b> ${e(party)}</p>
+  <table><thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+  <p class="tot" style="text-align:left">الإجمالي: ${fmt(h.total??tot)}</p>
+  <div style="display:flex;justify-content:space-between;margin-top:40px"><div style="border-top:1px solid #98a2b3;width:200px;text-align:center;padding-top:6px">توقيع المستلم</div><div style="border-top:1px solid #98a2b3;width:200px;text-align:center;padding-top:6px">توقيع المسؤول</div></div>`);
+}
+async function retView(){
+  const sel=window._rk!=='p';
+  const[SI,PI,RS]=await Promise.all([g('sales_invoices','date'),g('purchase_invoices','date'),g(sel?'sales_returns':'purchase_returns','date')]);
+  const L=sel?SI:PI;
+  const cur=(RT&&RT.s===sel)?RT:null;
+  const itemsHtml=cur?`<div class="card np"><div class="card-title"><b>بنود الفاتورة ${e(cur.number)}</b><span class="muted">اكتب الكمية المرتجعة لكل صنف ثم احفظ</span></div>${T(['الصنف','الكمية في الفاتورة','سعر الوحدة','كمية المرتجع'],cur.items.map((x,i)=>[e((by(C.products,x.product_id).name)||'—'),fmt(x.qty),fmt(x.unit_price),`<input id="rq${i}" type="number" step="0.001" min="0" value="0" style="width:110px">`]))}<div class="row"><button onclick="retSave()">حفظ المرتجع</button><button class="s" onclick="RT=null;R('soft')">إلغاء</button></div></div>`:'';
+  const rows=RS.slice().reverse().map(x=>[e(x.number),x.date,e((by(L,x.invoice_id).number)||'—'),e((by(sel?C.customers:C.suppliers,sel?x.customer_id:x.supplier_id).name)||'—'),fmt(x.total),`<button class="s" onclick="retPrint('${x.id}',${sel})">طباعة</button>`]);
+  return sectionHead('المرتجعات','مرتجع مرتبط بفاتورة، يُحفظ ويُطبع كمستند.')+
+    `<div class="card np"><div class="row"><select id="rk" onchange="window._rk=v('rk');RT=null;R('soft')"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select><select id="ri">${L.slice().reverse().map(x=>`<option value="${x.id}">${e(x.number)} — ${fmt(x.total)}</option>`).join('')}</select><button class="s" onclick="loadRet()">عرض البنود</button></div></div>${itemsHtml}<div class="card"><b>المرتجعات المسجلة</b>${T(['الرقم','التاريخ','الفاتورة','الطرف','الإجمالي',''],rows)}</div>`;
+}
+
+// ---------- قوائم الأسعار: عبر الدوال الصريحة + أقسام ----------
+async function priceView(){
+  const sec=secCur('price','lists');
+  const[PL,IT]=await Promise.all([g('price_lists','name'),g('price_list_items',null)]);
+  const bar=secBar('price',[['lists','القوائم'],['items','أسعار الأصناف'],['new','إضافة سعر']],'lists');
+  let body='';
+  if(sec==='lists') body=`<div class="card form-card"><div class="card-title"><b>قائمة أسعار جديدة</b></div><div class="row"><input id="pln" placeholder="اسم قائمة الأسعار"><input id="plcur" value="EGP" placeholder="العملة"><button class="btn" onclick="act(()=>rpc('create_price_list',{p_name:v('pln'),p_currency:v('plcur')}))">إنشاء القائمة</button></div></div><div class="card">${T(['القائمة','العملة','عدد الأصناف'],PL.map(x=>[e(x.name),e(x.currency||'EGP'),IT.filter(i=>i.price_list_id===x.id).length]))}</div>`;
+  else if(sec==='items'){
+    const rows=IT.map(x=>[e(by(PL,x.price_list_id).name),e(by(C.products,x.product_id).name),fmt(x.min_qty),fmt(x.price)]);
+    const texts=IT.map(x=>[by(PL,x.price_list_id).name,by(C.products,x.product_id).name].join(' '));
+    body=`<div class="card">${lsCard('pli',['القائمة','الصنف','الحد الأدنى','السعر'],rows,texts,'ابحث باسم الصنف أو القائمة...')}</div>`;
+  }
+  else body=`<div class="card form-card"><div class="card-title"><b>إضافة سعر صنف</b></div><div class="row"><select id="pli">${O(PL)}</select><select id="plp">${O(C.products)}</select><input id="plprice" type="number" step="0.0001" placeholder="السعر"><input id="plmin" type="number" value="1" min="0.001" placeholder="الحد الأدنى للكمية"><button class="btn" onclick="act(()=>rpc('add_price_list_item',{p_list:v('pli'),p_product:v('plp'),p_price:n('plprice'),p_min_qty:n('plmin')}))">إضافة السعر</button></div></div>`;
+  return sectionHead('قوائم الأسعار','أسعار البيع حسب القائمة والكمية.')+bar+body;
+}
+
+// ---------- العمولات: قواعد / حساب / سجل ----------
+async function commissionView(){
+  const sec=secCur('comm','rules');
+  const[RL,I,Cm]=await Promise.all([g('commission_rules','name'),g('sales_invoices','date'),g('sales_commissions','created_at')]);
+  const bar=secBar('comm',[['rules','قواعد العمولة'],['calc','حساب عمولة'],['list','العمولات المسجلة']],'rules');
+  let body='';
+  if(sec==='rules') body=`<div class="card form-card"><div class="card-title"><b>قاعدة عمولة جديدة</b></div><div class="row"><input id="crn" placeholder="اسم القاعدة"><input id="crr" type="number" step="0.0001" placeholder="النسبة %"><select id="crb"><option value="net_sales">صافي المبيعات</option><option value="gross_profit">مجمل الربح</option></select><button class="btn" onclick="act(()=>rpc('create_commission_rule',{p_name:v('crn'),p_rate:n('crr'),p_basis:v('crb')}))">إضافة القاعدة</button></div></div><div class="card">${T(['القاعدة','النسبة %','الأساس'],RL.map(x=>[e(x.name),x.rate,x.basis==='gross_profit'?'مجمل الربح':'صافي المبيعات']))}</div>`;
+  else if(sec==='calc') body=`<div class="card form-card"><div class="card-title"><b>حساب عمولة فاتورة</b></div><div class="row"><select id="cri">${I.filter(x=>x.status==='Posted').map(x=>`<option value="${x.id}">${e(x.number)} — ${fmt(x.total)}</option>`).join('')}</select><select id="crr2">${O(RL)}</select><button class="btn" onclick="act(()=>rpc('calculate_sales_commission',{p_invoice:v('cri'),p_rule:v('crr2')}))">حساب وتسجيل العمولة</button></div></div>`;
+  else body=`<div class="card">${T(['الفاتورة','البائع','الأساس','العمولة','الحالة'],Cm.map(x=>[e(by(I,x.invoice_id).number||x.invoice_id),e(x.salesperson_id),money(x.basis_amount),money(x.amount),chip(x.status,x.status==='Paid'?'success':'warning')]))}</div>`;
+  return sectionHead('العمولات','حساب عمولات البائعين بناءً على صافي المبيعات أو مجمل الربح.')+bar+body;
+}
+
+// ---------- الفترات المالية: إنشاء عبر الدالة الصريحة + أقسام ----------
+async function periodView(){
+  const sec=secCur('per','list');
+  const L=await g('fiscal_periods','start_date');
+  const bar=secBar('per',[['list','الفترات'],['new','فترة جديدة']],'list');
+  const body=sec==='new'?`<div class="card form-card"><div class="card-title"><b>فترة مالية جديدة</b></div><div class="row"><input id="fpn" placeholder="اسم الفترة (اختياري)"><label>من <input id="fps" type="date"></label><label>إلى <input id="fpe" type="date"></label><button class="btn" onclick="act(()=>rpc('create_fiscal_period',{p_name:v('fpn'),p_start:v('fps'),p_end:v('fpe')}))">إنشاء الفترة</button></div></div>`
+    :`<div class="card">${T(['الفترة','من','إلى','الحالة',''],L.map(x=>[e(x.name),x.start_date,x.end_date,chip(x.status,x.status==='Closed'?'danger':'success'),x.status==='Closed'?`<button class="btn soft" onclick="act(()=>rpc('reopen_fiscal_period',{p_period:'${x.id}'}))">فتح</button>`:`<button class="btn danger" onclick="act(()=>rpc('close_fiscal_period',{p_period:'${x.id}'}))">إقفال</button>`]))}</div>`;
+  return sectionHead('الفترات والإقفال','لا يُسمح بتعديل فترة مقفولة إلا بعد فتحها.')+bar+body;
+}
+
+// ---------- الأصول الثابتة: مبسطة + طباعة + التصنيفات في قسم ----------
+function assetNew(){
+  formModal('أصل ثابت جديد',
+    `<label class="fm-f"><span>اسم الأصل</span><input id="afn"></label><label class="fm-f"><span>التصنيف</span><select id="afc">${O(window._assetCats||[])}</select></label><label class="fm-f"><span>التكلفة</span><input id="afcost" type="number"></label><label class="fm-f"><span>القيمة المتبقية</span><input id="afres" type="number" value="0"></label><label class="fm-f"><span>العمر بالشهور</span><input id="aflife" type="number" value="60"></label><label class="fm-f"><span>حساب الدفع</span><select id="afacct">${O(C.accts)}</select></label>`,
+    async()=>{const id=await rpc('create_fixed_asset',{p_name:v('afn'),p_category:v('afc'),p_cost:n('afcost'),p_residual:n('afres'),p_life_months:n('aflife'),p_purchase_date:new Date().toISOString().slice(0,10),p_branch:null});await rpc('capitalize_fixed_asset',{p_asset:id,p_credit_account:v('afacct')})},'إضافة وتسجيل');
+}
+async function assetView(){
+  const sec=secCur('asset','list');
+  const[A,CAT]=await Promise.all([g('fixed_assets','created_at'),g('asset_categories','name')]);
+  window._assetCats=CAT;
+  const bar=secBar('asset',[['list','الأصول'],['cat','التصنيفات']],'list');
+  const today=new Date().toISOString().slice(0,10);
+  let body='';
+  if(sec==='cat') body=`<div class="card form-card"><div class="card-title"><b>تصنيف جديد</b></div><div class="row"><input id="acn" placeholder="اسم التصنيف"><input id="acl" type="number" value="60" placeholder="العمر الإنتاجي بالشهور"><button class="btn" onclick="act(()=>rpc('create_asset_category',{p_name:v('acn'),p_life_months:n('acl')}))">إضافة التصنيف</button></div></div><div class="card">${T(['التصنيف','العمر (شهور)'],CAT.map(x=>[e(x.name),x.default_life_months]))}</div>`;
+  else{
+    const rows=A.map(x=>[e(x.code),e(x.name),fmt(x.cost),fmt(x.accumulated_depreciation),fmt(x.cost-x.accumulated_depreciation),chip(x.status,x.status==='Disposed'?'danger':'success'),x.status==='Active'?`<div class="row-btns"><button class="s" onclick="act(()=>rpc('depreciate_asset',{p_asset:'${x.id}',p_period:'${today}'}))">إهلاك</button><button class="danger" onclick="act(()=>rpc('dispose_fixed_asset',{p_asset:'${x.id}',p_date:'${today}',p_proceeds:0,p_account:null}))">استبعاد</button></div>`:'—']);
+    ptStore('asset','الأصول الثابتة','',['الكود','الأصل','التكلفة','المجمع','الصافي','الحالة'],A.map(x=>[e(x.code),e(x.name),fmt(x.cost),fmt(x.accumulated_depreciation),fmt(x.cost-x.accumulated_depreciation),e(x.status)]));
+    body=`<div class="card np"><div class="row"><button onclick="assetNew()">+ أصل ثابت جديد</button><button class="s" onclick="ptPrint('asset')">طباعة القائمة</button></div></div><div class="card">${T(['الكود','الأصل','التكلفة','المجمع','الصافي','الحالة',''],rows)}</div>`;
+  }
+  return sectionHead('الأصول الثابتة','أضف الأصل من الزر، والإهلاك والاستبعاد من نفس الصف.')+bar+body;
+}
+
+// ---------- البنوك: كل وظيفة في قسمها ----------
+async function bankView(){
+  const sec=secCur('bank','st');
+  const banks=(C.accts||[]).filter(a=>a.type==='bank');
+  const[stm,lines,payments]=await Promise.all([g('bank_statements','created_at'),g('bank_statement_lines','created_at'),g('payments','date')]);
+  const today=new Date().toISOString().slice(0,10);
+  const bar=secBar('bank',[['st','كشوف البنك'],['ln','حركات الكشف'],['rc','المطابقة']],'st');
+  let body='';
+  if(sec==='st') body=`<div class="card form-card"><div class="card-title"><b>كشف بنك جديد</b></div><div class="row"><select id="bka">${O(banks)}</select><input id="bkn" placeholder="رقم كشف البنك"><input id="bkopen" type="number" placeholder="رصيد أول المدة"><input id="bkclose" type="number" placeholder="رصيد آخر المدة"><button class="btn" onclick="act(()=>ins('bank_statements',{account_id:v('bka'),statement_no:v('bkn'),opening_balance:n('bkopen'),closing_balance:n('bkclose')}))">إنشاء الكشف</button></div></div><div class="card">${T(['الحساب','الكشف','من','إلى','أول المدة','آخر المدة','الحالة'],stm.map(x=>[e(by(C.accts,x.account_id).name),e(x.statement_no),x.from_date||'',x.to_date||'',money(x.opening_balance),money(x.closing_balance),chip(x.status,x.status==='Reconciled'?'success':'warning')]))}</div>`;
+  else if(sec==='ln') body=`<div class="card form-card"><div class="card-title"><b>إضافة حركة كشف</b></div><div class="row"><select id="bks">${stm.map(x=>`<option value="${x.id}">${e(x.statement_no)}</option>`).join('')}</select><input id="bkdate" type="date" value="${today}"><input id="bkdesc" placeholder="البيان"><input id="bkamt" type="number" placeholder="المبلغ"><select id="bkdir"><option value="credit">داخل</option><option value="debit">خارج</option></select><button class="btn soft" onclick="act(()=>ins('bank_statement_lines',{statement_id:v('bks'),txn_date:v('bkdate'),description:v('bkdesc'),amount:n('bkamt'),direction:v('bkdir')}))">إضافة</button></div></div><div class="card">${T(['التاريخ','البيان','المبلغ','الاتجاه','مطابق'],lines.map(x=>[x.txn_date,e(x.description||''),money(x.amount),x.direction==='credit'?'داخل':'خارج',x.reconciled?'✓':'—']))}</div>`;
+  else body=`<div class="card form-card"><div class="card-title"><b>مطابقة حركة كشف مع مدفوعة</b></div><div class="row"><select id="bkl">${lines.filter(x=>!x.reconciled).map(x=>`<option value="${x.id}">${x.txn_date} — ${e(x.description||'')} — ${fmt(x.amount)}</option>`).join('')}</select><select id="bkp">${payments.map(x=>`<option value="${x.id}">${x.date} — ${fmt(x.amount)} — ${e(x.doc_ref||'')}</option>`).join('')}</select><button class="btn" onclick="act(()=>rpc('reconcile_bank_line',{p_line:v('bkl'),p_payment:v('bkp')}))">مطابقة</button></div></div>`;
+  return sectionHead('البنوك والتسويات البنكية','كشوف البنك، حركاتها، ومطابقتها مع المقبوضات والمدفوعات.')+bar+body;
+}
+
+// ---------- الخزينة: الحسابات / التحويلات / حركة الخزينة ----------
+const LEDGER_SRC={create_sale:'فاتورة بيع',create_purchase:'فاتورة شراء',record_payment:'تحصيل / دفع',create_expense:'مصروف',transfer_cash:'تحويل بين الحسابات',pay_payroll:'دفع مرتب',cancel_sales_invoice:'إلغاء فاتورة',edit_sales_invoice:'تعديل فاتورة',create_sales_return:'مرتجع بيع',create_purchase_return:'مرتجع شراء',record_cheque:'شيك',update_cheque_status:'تحصيل شيك',reconcile_bank_line:'مطابقة بنك',capitalize_fixed_asset:'رسملة أصل',dispose_fixed_asset:'استبعاد أصل'};
+async function cashLedgerHtml(){
+  const day=dyGet('led');const[a,b]=dayRange(day);
+  const[res,PN]=await Promise.all([sb.from('cash_movements').select('*').gte('created_at',a).lt('created_at',b).order('created_at',{ascending:false}).limit(3000),profNames()]);
+  if(res.error)throw res.error;
+  const L=(res.data||[]).filter(x=>cday(x.created_at)===day);
+  const an=id=>(by(C.accts,id).name)||'—';
+  let tin=0,tout=0;L.forEach(x=>{if(x.direction==='in')tin+=+x.amount;else tout+=+x.amount});
+  const tm=x=>new Date(x.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'});
+  const rows=L.map(x=>[tm(x),e(an(x.account_id)),x.direction==='in'?'<span class="good">داخل ＋</span>':'<span class="bad">خارج −</span>',fmt(x.amount),e(LEDGER_SRC[x.source]||x.source||'—'),e(PN[x.user_id]||'—')]);
+  const texts=L.map(x=>[an(x.account_id),LEDGER_SRC[x.source]||x.source||'',PN[x.user_id]||'',x.direction==='in'?'داخل':'خارج'].join(' '));
+  const dl=new Date(day+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Cairo'});
+  ptStore('led','حركة الخزينة — '+dl,'',['الوقت','الحساب','الاتجاه','المبلغ','المصدر','المستخدم'],L.map(x=>[tm(x),e(an(x.account_id)),x.direction==='in'?'داخل':'خارج',fmt(x.amount),e(LEDGER_SRC[x.source]||x.source||'—'),e(PN[x.user_id]||'—')]),`<p class="tot">داخل: ${fmt(tin)} · خارج: ${fmt(tout)} · الصافي: ${fmt(tin-tout)}</p>`);
+  return `${dayStrip('led',day)}<div class="card"><div class="card-title"><b>حركة ${e(dl)}</b><div class="row"><span class="chip success">داخل ${fmt(tin)}</span><span class="chip danger">خارج ${fmt(tout)}</span><span class="chip info">الصافي ${fmt(tin-tout)}</span><button class="s" onclick="ptPrint('led')">طباعة هذا اليوم</button></div></div>${lsCard('led',['الوقت','الحساب','الاتجاه','المبلغ','المصدر','المستخدم'],rows,texts,'ابحث بالحساب أو المصدر أو المستخدم...')}</div>`;
+}
+async function cashView(){
+  const sec=secCur('cash','acc');
+  const bar=secBar('cash',[['acc','الحسابات'],['trf','التحويلات'],['led','حركة الخزينة']],'acc');
+  let body='';
+  if(sec==='acc') body=`<div class="card form-card"><div class="card-title"><b>حساب جديد</b></div><div class="row"><input id="an" placeholder="اسم الحساب"><select id="at"><option value="cash">خزينة</option><option value="bank">بنك</option><option value="wallet">محفظة</option><option value="other">أخرى</option></select><input id="ao" type="number" placeholder="رصيد افتتاحي"><button class="btn" onclick="act(()=>ins('cash_accounts',{name:v('an'),type:v('at'),opening_balance:n('ao'),balance:n('ao')}))">إضافة</button></div></div><div class="card">${T(['الحساب','النوع','الرصيد'],C.accts.map(a=>[e(a.name),a.type,money(a.balance)]))}</div>`;
+  else if(sec==='trf') body=`<div class="card form-card"><div class="card-title"><b>تحويل بين الحسابات</b></div><div class="row"><select id="ctf">${O(C.accts)}</select><select id="ctt">${O(C.accts)}</select><input id="ctam" type="number" placeholder="المبلغ"><button class="btn" onclick="act(()=>{if(v('ctf')===v('ctt'))throw Error('اختر حسابين مختلفين');return rpc('transfer_cash',{p_from:v('ctf'),p_to:v('ctt'),p_amount:n('ctam')})})">تحويل</button></div></div><div class="card"><b>سجل التحويلات</b>${await cashTransfersHtml()}</div>`;
+  else body=await cashLedgerHtml();
+  return sectionHead('الخزينة','الحسابات النقدية، التحويلات بينها، وحركة الخزينة اليومية.')+bar+body;
+}
+
+// ---------- المصروفات: مقسّمة بالأيام ----------
+async function expensesView(){
+  const L=await g('expenses','date');
+  const day=dyGet('exp');
+  const sumOf=d=>L.filter(x=>x.date===d).reduce((a,x)=>a+Number(x.amount||0),0);
+  const rowsDay=L.filter(x=>x.date===day).reverse();
+  const tot=rowsDay.reduce((a,x)=>a+Number(x.amount||0),0);
+  const cells=rowsDay.map(x=>[e(x.category||''),e(x.description||''),money(x.amount),e((by(C.accts,x.account_id).name)||'—')]);
+  ptStore('exp','المصروفات — '+day,'',['التصنيف','الوصف','المبلغ','الحساب'],rowsDay.map(x=>[e(x.category||''),e(x.description||''),fmt(x.amount),e((by(C.accts,x.account_id).name)||'—')]),`<p class="tot">الإجمالي: ${fmt(tot)}</p>`);
+  return sectionHead('المصروفات','تسجيل المصروف يتم بتاريخ اليوم. الأيام السابقة للعرض والطباعة.')+
+  `<div class="card form-card"><div class="card-title"><b>تسجيل مصروف (اليوم)</b></div><div class="row"><select id="ec"><option>إيجار</option><option>كهرباء</option><option>مياه</option><option>إنترنت</option><option>رواتب</option><option>نقل</option><option>صيانة</option><option>تسويق</option><option>أخرى</option></select><input id="ed" placeholder="الوصف"><input id="ea" type="number" placeholder="المبلغ"><select id="ex">${O(C.accts)}</select><button class="btn" onclick="act(()=>rpc('create_expense',{p_category:v('ec'),p_desc:v('ed'),p_amount:n('ea'),p_account:v('ex')}))">حفظ</button></div></div>`+
+  dayStrip('exp',day,d=>fmt(sumOf(d)))+
+  `<div class="card"><div class="card-title"><b>مصروفات ${e(day)}</b><div class="row"><span class="chip info">الإجمالي ${fmt(tot)}</span><button class="s" onclick="ptPrint('exp')">طباعة هذا اليوم</button></div></div>${T(['التصنيف','الوصف','المبلغ','الحساب'],cells)}</div>`;
+}
+
+// ---------- الموظفون: بحث + تعديل + ربط بحساب النظام ----------
+async function employeesView(){
+  const[L,U]=await Promise.all([g('employees','name'),g('profiles','name').catch(()=>[])]);
+  window._empL=L;window._empU=U;
+  const canE=isAdminRole()||me.role==='accountant';
+  const uname=id=>{const u=U.find(x=>x.id===id);return u?(u.name||u.username||''):''};
+  const rows=L.map(x=>[e(x.name),e(x.job||''),e(x.phone||''),fmt(x.salary),e(uname(x.user_id)||'—'),x.active?'نشط':'موقوف',canE?`<button class="s" onclick="empForm('${x.id}')">تعديل</button>`:'']);
+  const texts=L.map(x=>[x.name,x.job,x.phone,uname(x.user_id)].join(' '));
+  return `${sectionHead('الموظفون','بيانات الموظف، ومن يملك حساب دخول للنظام.')}${canE?`<div class="card np"><div class="row"><button onclick="empForm()">+ موظف جديد</button></div></div>`:''}<div class="card">${lsCard('emp',['الاسم','الوظيفة','الهاتف','المرتب','حساب النظام','الحالة',''],rows,texts,'ابحث بالاسم أو الوظيفة أو الهاتف...')}</div>`;
+}
+function empForm(id){
+  const x=id?by(window._empL||[],id):{};const U=window._empU||[];
+  const opts=`<option value="">— بدون حساب —</option>`+U.map(u=>`<option value="${u.id}" ${x.user_id===u.id?'selected':''}>${e(u.name||u.username||'')}</option>`).join('');
+  formModal(id?'تعديل موظف':'موظف جديد',
+    `<label class="fm-f"><span>الاسم</span><input id="em_n" value="${e(x.name||'')}"></label><label class="fm-f"><span>الوظيفة</span><input id="em_j" value="${e(x.job||'')}"></label><label class="fm-f"><span>الهاتف</span><input id="em_h" value="${e(x.phone||'')}"></label><label class="fm-f"><span>المرتب</span><input id="em_s" type="number" value="${x.salary||0}"></label><label class="fm-f"><span>تاريخ التعيين</span><input id="em_d" type="date" value="${x.joining_date||''}"></label><label class="fm-f"><span>حساب الدخول للنظام</span><select id="em_u">${opts}</select></label>${id?`<label class="fm-f"><span>الحالة</span><select id="em_a"><option value="1" ${x.active?'selected':''}>نشط</option><option value="0" ${x.active?'':'selected'}>موقوف</option></select></label>`:''}`,
+    async()=>{
+      const body={name:v('em_n').trim(),job:v('em_j')||null,phone:v('em_h')||null,salary:n('em_s'),joining_date:v('em_d')||null,user_id:v('em_u')||null};
+      if(!body.name)throw Error('اكتب اسم الموظف');
+      if(id){body.active=v('em_a')==='1';await upd('employees',id,body)}
+      else{await ins('employees',{...body,active:true})}
+    },'حفظ');
+}
+
+// ---------- الموارد البشرية: كل قسم في تبويبه (حضور / إجازات / مكافآت وجزاءات / عطلات) ----------
+function dCount(f,t){const d=Math.round((new Date(t)-new Date(f))/86400000)+1;return d>0?d:1}
+async function hrView(){
+  const sec=secCur('hr','att');
+  const[E,L,Adj,Holi,types]=await Promise.all([g('employees','name'),g('leave_requests',null),g('employee_adjustments','effective_date'),g('holidays','holiday_date'),g('leave_types','name')]);
+  const today=new Date().toISOString().slice(0,10);
+  const bar=secBar('hr',[['att','الحضور'],['leave','الإجازات'],['adj','مكافآت وجزاءات'],['hol','العطلات']],'att');
+  let body='';
+  if(sec==='att') body=`<div class="card form-card"><div class="card-title"><b>تسجيل حضور</b><span class="muted">اختار الموظف والتاريخ والحالة. أوقات الحضور اختيارية.</span></div><div class="row"><select id="he">${O(E)}</select><input id="hd" type="date" value="${today}"><select id="hs"><option>Present</option><option>Late</option><option>Absent</option><option>Leave</option><option>Holiday</option></select><button class="btn" onclick="act(()=>ins('attendance',{employee_id:v('he'),work_date:v('hd'),check_in:v('hi')||null,check_out:v('ho')||null,status:v('hs')}))">تسجيل</button></div><details class="mt10"><summary>أوقات الحضور والانصراف (اختياري)</summary><div class="row"><input id="hi" type="datetime-local"><input id="ho" type="datetime-local"></div></details></div>`;
+  else if(sec==='leave') body=`<div class="card form-card"><div class="card-title"><b>طلب إجازة</b></div><div class="row"><select id="hle">${O(E)}</select><select id="hlt">${O(types)}</select><input id="hf" type="date"><input id="ht" type="date"><input id="hlr" placeholder="السبب"><button class="btn soft" onclick="act(()=>ins('leave_requests',{employee_id:v('hle'),leave_type_id:v('hlt'),from_date:v('hf'),to_date:v('ht'),days:dCount(v('hf'),v('ht')),reason:v('hlr')}))">تقديم الطلب</button></div></div><div class="card">${T(['الموظف','من','إلى','الأيام','الحالة','السبب'],L.map(x=>[e(by(E,x.employee_id).name),x.from_date,x.to_date,x.days,chip(x.status,x.status==='Approved'?'success':x.status==='Rejected'?'danger':'warning'),e(x.reason)]))}</div>`;
+  else if(sec==='adj') body=`<div class="card form-card"><div class="card-title"><b>مكافأة / جزاء</b><span class="muted">يُربط بشهر المرتب ويدخل في حسابه.</span></div><div class="row"><select id="ae">${O(E)}</select><select id="ak"><option value="reward">مكافأة</option><option value="penalty">جزاء</option></select><input id="aa" type="number" placeholder="المبلغ"><input id="ad" type="date" value="${today}"><input id="am" type="month"><input id="ar" placeholder="السبب"><button class="btn" onclick="act(()=>ins('employee_adjustments',{employee_id:v('ae'),kind:v('ak'),amount:n('aa'),effective_date:v('ad'),payroll_month:v('am')?v('am')+'-01':null,reason:v('ar')}))">إضافة</button></div></div><div class="card">${T(['الموظف','النوع','المبلغ','التاريخ','الشهر','الاعتماد'],Adj.map(x=>[e(by(E,x.employee_id).name),x.kind==='reward'?'مكافأة':'جزاء',money(x.amount),x.effective_date,x.payroll_month?x.payroll_month.slice(0,7):'—',chip(x.approved?'معتمد':'معلّق',x.approved?'success':'warning')]))}</div>`;
+  else body=`<div class="card form-card"><div class="card-title"><b>العطلات الرسمية</b><span class="muted">تُستخدم لتحديد حالة Holiday في الحضور.</span></div><div class="row"><input id="hn" placeholder="اسم العطلة"><input id="hdx" type="date"><label><input type="checkbox" id="hp" checked> مدفوعة</label><button class="btn soft" onclick="act(()=>ins('holidays',{name:v('hn'),holiday_date:v('hdx'),paid:$('#hp').checked}))">إضافة عطلة</button></div></div><div class="card">${T(['العطلة','التاريخ','مدفوعة'],Holi.map(x=>[e(x.name),x.holiday_date,x.paid?'نعم':'لا']))}</div>`;
+  return sectionHead('الموارد البشرية','الحضور والإجازات والمكافآت والجزاءات والعطلات — كل قسم في تبويبه.')+bar+body;
+}
+
+// ---------- المرتبات: التفاصيل في نافذة ----------
+async function payShow(id){
+  const[E,L]=await Promise.all([g('employees','name'),g('payroll','month')]);
+  const x=L.find(r=>r.id===id);if(!x)return toast('لم يتم العثور على الكشف');
+  showModal(`<div class="card-title"><b>تفاصيل كشف المرتب</b><span class="muted">${e(String(x.month||'').slice(0,7))}</span></div>${T(['البند','القيمة'],payslipRows(x,E))}`,`<button class="btn soft" onclick="modalPrint('كشف مرتب')">طباعة</button>`);
+}
+
+// ---------- المدفوعات: تسجيل / سجل / أرصدة ----------
+async function payView(){
+  const sec=secCur('pay','new');
+  const cu=window._yk!=='supp';const L=cu?C.customers:C.suppliers;const P_=cu?C.cb:C.sbal;
+  const bar=secBar('pay',[['new','تسجيل دفعة'],['hist','سجل الدفعات'],['bal','الأرصدة']],'new');
+  let body='';
+  if(sec==='new') body=`<div class="card np"><div class="row"><select id="yk" onchange="window._yk=v('yk')==='receipt'?'cust':'supp';R()"><option value="receipt" ${cu?'selected':''}>مقبوضات عميل</option><option value="payment" ${cu?'':'selected'}>مدفوعات مورد</option></select><select id="yp" onchange="loadPayInvoices()">${O(L)}</select><select id="yinv"><option value="">دفعة على الحساب (بدون تخصيص)</option></select><input id="ya" type="number" placeholder="المبلغ"><select id="yc">${O(C.accts)}</select><button onclick="savePayment()">تسجيل الدفعة</button></div><p class="muted">يمكن ترك الفاتورة فارغة ليصبح المبلغ رصيدًا غير مخصص، ثم تخصيصه لاحقًا.</p></div>`;
+  else if(sec==='hist'){
+    const P=await g('payments','date');
+    const nm=p=>p.kind==='receipt'?(by(C.customers,p.customer_id).name||''):(by(C.suppliers,p.supplier_id).name||'');
+    const rows=P.slice().reverse().map(p=>[p.date,p.kind==='receipt'?'مقبوض':'مدفوع',e(nm(p)||'—'),fmt(p.amount),e((by(C.accts,p.account_id).name)||''),e(p.doc_ref||'')]);
+    const texts=P.slice().reverse().map(p=>[p.date,p.kind==='receipt'?'مقبوض':'مدفوع',nm(p),(by(C.accts,p.account_id).name)||'',p.doc_ref||''].join(' '));
+    body=`<div class="card">${lsCard('pay',['التاريخ','النوع','الطرف','المبلغ','الحساب','المستند'],rows,texts,'ابحث بالاسم أو النوع أو المستند...')}</div>`;
+  }
+  else body=`<div class="card"><b>الأرصدة</b>${T(['الاسم','الرصيد'],L.map(x=>[e(x.name),fmt(by(P_,x.id).balance)]))}</div>`;
+  return sectionHead('المدفوعات والتحصيل','تسجيل المقبوضات والمدفوعات وتخصيصها على الفواتير.')+bar+body;
+}
+
+// ---------- كشف الحساب: البحث عن الطرف (بدون تغيير سلوك) ----------
+async function stmtView(){const cu=window._sk!=='s';return `<h2>كشف الحساب</h2><div class="card np"><select id="sk" onchange="window._sk=v('sk');window._stp=null;st='';R()"><option value="c" ${cu?'selected':''}>عميل</option><option value="s" ${cu?'':'selected'}>مورد</option></select><div class="stmt-pick"><input id="sq2" placeholder="ابحث باسم ${cu?'العميل':'المورد'} أو رقم الهاتف" autocomplete="off" oninput="stSearch(this.value)"><div id="stRes" class="stmt-res"></div><div class="muted">الطرف المختار: <b id="stSel">${(by(cu?C.customers:C.suppliers,window._stp)||{}).name?e(by(cu?C.customers:C.suppliers,window._stp).name):'لم يتم اختيار طرف'}</b></div></div> من <input type="date" id="sa"> إلى <input type="date" id="sb2"><button onclick="showStmt()">عرض</button><button class="s" onclick="window.print()">طباعة / PDF</button></div><div class="card">${st||'اختر الطرف والفترة ثم اضغط عرض'}</div>`}
+
+// ---------- المستخدمون: تعديل وتغيير كلمة السر والصلاحيات في نوافذ ----------
+async function usersView(){
+  const L=(await g('profiles','created_at')).filter(u=>me.isDev||u.role!=='developer');
+  window._usersL=L;
+  const isA=isAdminRole();
+  const rows=L.map(u=>{
+    const top=(u.role==='admin'||u.role==='developer');
+    return [e(u.name),e(u.username),top?'<b>admin</b>':e(u.role),chip(top?'كامل':(u.permissions_mode==='custom'?'مخصص':'حسب الدور'),top?'success':(u.permissions_mode==='custom'?'warning':'info')),
+      `<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`,
+      `<div class="row-btns">${isA?`<button class="s" onclick="userEdit('${u.id}')">تعديل</button><button class="s" onclick="userResetPw('${u.id}')">تغيير كلمة السر</button>`:''}${top?'':`<button class="s" onclick="openPermissionEditor('${u.id}')">الصلاحيات</button>`}</div>`];
+  });
+  return `${sectionHead('المستخدمون والصلاحيات','الدور الأساسي يحدد الحد الأعلى، والتخصيص يختار ما يظهر لكل مستخدم.')}${isA?addUserCard():''}<div class="card">${T(['الاسم','البريد','الدور الأساسي','الوضع','مفعّل',''],rows)}</div>`;
+}
+function userEdit(id){
+  const u=by(window._usersL||[],id);if(!u.id)return;
+  const roles=['accountant','sales','store','admin',...(me.isDev?['developer']:[])];
+  formModal('تعديل المستخدم',
+    `<label class="fm-f"><span>الاسم</span><input id="ue_n" value="${e(u.name||'')}"></label><label class="fm-f"><span>البريد (اسم الدخول)</span><input id="ue_e" type="email" value="${e(u.username||'')}"></label><label class="fm-f"><span>الدور</span><select id="ue_r" ${u.id===me.id?'disabled':''}>${roles.map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></label>`,
+    async()=>{
+      const name=v('ue_n').trim(),email=v('ue_e').trim().toLowerCase(),role=v('ue_r')||u.role;
+      if(!name)throw Error('اكتب الاسم');
+      if(email!==(u.username||'')){await fnCall({action:'update_user',user_id:id,name,email,role})}
+      else{await upd('profiles',id,{name,role})}
+    },'حفظ التعديل');
+}
+function userResetPw(id){
+  const u=by(window._usersL||[],id);
+  formModal('تغيير كلمة السر: '+e(u.name||''),
+    `<label class="fm-f"><span>كلمة السر الجديدة (8 حروف على الأقل)</span><input id="rp_1" type="password" autocomplete="new-password"></label><label class="fm-f"><span>تأكيد كلمة السر</span><input id="rp_2" type="password" autocomplete="new-password"></label>`,
+    async()=>{const a=v('rp_1'),b=v('rp_2');if(a.length<8)throw Error('كلمة السر لازم تكون 8 حروف على الأقل');if(a!==b)throw Error('كلمتا السر غير متطابقتين');await fnCall({action:'reset_password',user_id:id,password:a});toast('تم تغيير كلمة السر')},
+    'تغيير كلمة السر');
+}
+async function openPermissionEditor(id){
+  const r=await rpc('admin_get_user_permissions',{p_user:id});
+  if(!r)throw Error('تعذر تحميل الصلاحيات');
+  permEditorUser=id;permEditorMode=r.mode||'role';permEditorSet=new Set(Array.isArray(r.permissions)?r.permissions:[]);
+  const t=by(window._usersL||[],id);
+  showModal(`<div class="card-title"><div><b>صلاحيات: ${e(t.name||'')}</b><div class="muted">الدور الأساسي: ${e(t.role||'')} · التخصيص يضيّق صلاحيات الدور ولا يوسعها.</div></div><span class="chip ${permEditorMode==='custom'?'warning':'success'}">${permEditorMode==='custom'?'مخصص':'حسب الدور'}</span></div>${PERMISSION_GROUPS.map(([title,items])=>`<div class="perm-group"><h4>${title}</h4><div class="perm-grid">${items.map(([pid,label])=>{const allowed=canBaseForRole(t.role,pid);const checked=permEditorSet.has(pid);return `<label class="perm-item ${allowed?'':'disabled'}"><input type="checkbox" ${checked?'checked':''} ${allowed?'':'disabled'} onchange="togglePerm('${pid}',this.checked)"><span>${label}</span>${allowed?'':'<small>خارج الدور</small>'}</label>`}).join('')}</div></div>`).join('')}`,
+    `<button class="btn" onclick="savePermissionEditor()">حفظ التخصيص</button><button class="btn soft" onclick="resetPermissionEditor()">إرجاع لصلاحيات الدور</button>`);
+}
+async function savePermissionEditor(){
+  if(!permEditorUser)return;
+  await act(async()=>{await rpc('save_user_permissions',{p_user:permEditorUser,p_permissions:[...permEditorSet]});closeModal()});
+  toast('تم حفظ الصلاحيات المخصصة');
+}
+async function resetPermissionEditor(){
+  if(!permEditorUser)return;
+  await act(async()=>{await rpc('reset_user_permissions',{p_user:permEditorUser});closeModal()});
+  toast('تم إرجاع المستخدم لصلاحيات الدور الأساسي');
+}
+
+// ---------- سجل العمليات: أقسام (السجل / حركات المخزون) + طباعة لأي يوم ----------
+async function auditView(){
+  const sec=secCur('aud','log');
+  const day=dyGet('aud');const today=cday(new Date());const[a,b]=dayRange(day);
+  const from14=new Date(Date.now()-14*86400000).toISOString();
+  const[ov,q1,PN]=await Promise.all([sb.from('audit_logs').select('created_at').gte('created_at',from14).limit(5000),sb.from('audit_logs').select('*').gte('created_at',a).lt('created_at',b).order('created_at',{ascending:false}).limit(3000),profNames()]);
+  if(ov.error)throw ov.error;if(q1.error)throw q1.error;
+  const cnt={};(ov.data||[]).forEach(x=>{const d=cday(x.created_at);cnt[d]=(cnt[d]||0)+1});
+  const L=(q1.data||[]).filter(x=>cday(x.created_at)===day);
+  const tm=x=>new Date(x.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'});
+  const rows=L.map(x=>[tm(x),e(x.user_name||PN[x.user_id]||'—'),e(auAct(x.action)),e(auEnt(x.entity)),e(x.description||'')]);
+  const texts=L.map(x=>[x.user_name||'',auAct(x.action),auEnt(x.entity),x.description||''].join(' '));
+  const dl=new Date(day+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Cairo'});
+  const bar=secBar('aud',[['log','سجل العمليات'],['mv','حركات المخزون']],'log');
+  let body;
+  if(sec==='mv'){
+    const mv=await mvHtml(day,PN);
+    body=`<div class="card"><div class="card-title"><b>حركات المخزون — ${e(dl)}</b><button class="s" onclick="ptPrintLS('mv','حركات المخزون — ${e(dl)}')">طباعة هذا اليوم</button></div>${mv}</div>`;
+  } else {
+    body=`<div class="card"><div class="card-title"><b>عمليات ${e(dl)}</b><div class="row"><span class="chip ${day===today?'info':'success'}">${day===today?'اليوم (مفتوح)':'يوم مقفول'} · ${L.length} عملية</span><button class="s" onclick="ptPrintLS('audit','سجل العمليات — ${e(dl)}')">طباعة هذا اليوم</button></div></div>${lsCard('audit',['الوقت','المستخدم','نوع العملية','الجزء المتأثر','التفاصيل'],rows,texts,'ابحث باسم المستخدم أو نوع العملية أو التفاصيل...')}</div>`;
+  }
+  return sectionHead('سجل العمليات','كل عملية مسجلة باسم المستخدم والوقت. الأيام السابقة مقفولة للمراجعة.')+
+    dayStrip('aud',day,d=>(cnt[d]||0)+' عملية')+bar+body;
+}
+
+// ---------- الصفحات الأخرى (المرجع) ----------
+async function legacyHtml(){
+  if(view==='prod')return productsView(); if(view==='cust')return masterForm('cust'); if(view==='supp')return masterForm('supp');
+  if(view==='sales')return (await invoiceView(true)); if(view==='purch')return (await invoiceView(false));
+  if(view==='pay')return await payView(); if(view==='trf')return await transferView(); if(view==='stk')return await stocktakeView();
+  if(view==='ret')return await retView(); if(view==='quo')return await quotationsView(); if(view==='ord')return await ordersView(); if(view==='stmt')return await stmtView();
+  if(view==='exp')return await expensesView();
+  if(view==='cash')return await cashView();
+  if(view==='emp')return await employeesView(); if(view==='prl')return await payrollView(); if(view==='users')return await usersView(); if(view==='audit')return await auditView(); if(view==='set')return await settingsView();
+  return '';
+}
+
 </script>
 </body></html>
