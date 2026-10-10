@@ -541,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.30';
+const APP_VERSION='v1.31';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -629,52 +629,132 @@ function invFilter(q){
   q=(q||'').trim().toLowerCase();
   document.querySelectorAll('#invBody tr').forEach(r=>{r.style.display=(!q||(r.dataset.s||'').includes(q))?'':'none'});
 }
+// --- v1.31: شاشة إدخال الفاتورة الجديدة (خطوات واضحة، بحث سريع، بدون إعادة تحميل) ---
+function invSearch(k,q){
+  const box=document.getElementById('invRes');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.innerHTML='';return}
+  const list=C.products.filter(p=>p.active&&[p.name,p.code,p.barcode].join(' ').toLowerCase().includes(q)).slice(0,8);
+  box.innerHTML=list.length?list.map(p=>`<button type="button" class="ix-res" onclick="invPick('${k}','${p.id}')"><b>${e(p.name)}</b><small>${e(p.code||'بدون كود')} · السعر ${fmt(k==='s'?p.sale_price:p.purchase_price)} · مخزون ${stkQty(p.id)}</small></button>`).join(''):'<div class="ix-note">لا توجد أصناف مطابقة</div>';
+}
+function invPickFirst(k){const b=document.querySelector('#invRes .ix-res');if(b)b.click()}
+function invPick(k,id){
+  const p=by(C.products,id);if(!p.id)return;
+  document.getElementById('il').value=id;
+  const def=k==='s'?p.sale_price:p.purchase_price;
+  document.getElementById('invRes').innerHTML='';
+  document.getElementById('invQ').value='';
+  document.getElementById('invSel').innerHTML=`<div class="ix-selbox"><div><b>${e(p.name)}</b><small>السعر الافتراضي ${fmt(def)} · مخزون ${stkQty(p.id)}</small></div>
+    <div class="ix-selctl">
+      <div class="ix-field"><span>الكمية</span><div class="ix-stepper"><button type="button" onclick="invStep(-1)">−</button><input id="iq" type="number" value="1" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();invAdd('${k}')}"><button type="button" onclick="invStep(1)">+</button></div></div>
+      <label class="ix-field">السعر<input id="ir" type="number" inputmode="decimal" placeholder="${fmt(def)}"></label>
+      <label class="ix-field">الخصم<input id="id" type="number" value="0" inputmode="decimal"></label>
+      <button type="button" class="ix-add" onclick="invAdd('${k}')">إضافة للفاتورة</button>
+    </div></div>`;
+  const q=document.getElementById('iq');if(q){q.focus();q.select()}
+}
+function invStep(d){const q=document.getElementById('iq');if(!q)return;q.value=Math.max(1,(+q.value||0)+d)}
+function invAdd(k){
+  const p=by(C.products,v('il'));
+  const q=n('iq'),pr=n('ir')||(k==='s'?p.sale_price:p.purchase_price),d=n('id');
+  if(!p.id)return toast('اختر صنفاً أولاً');
+  if(!(q>0))return toast('الكمية لازم تكون أكبر من صفر');
+  if(pr<0)return toast('السعر غير صحيح');
+  cart[k].push({product_id:p.id,qty:q,price:+pr,discount:d});
+  document.getElementById('il').value='';
+  document.getElementById('invSel').innerHTML='';
+  invRedraw(k);
+  document.getElementById('invQ').focus();
+}
+function invCartList(k){
+  const cr=cart[k]||[];
+  if(!cr.length)return '<div class="ix-empty">لم تُضف أصناف بعد. ابحث عن صنف فوق وأضفه.</div>';
+  const head='<div class="ix-row ix-head"><span>الصنف</span><span>الكمية</span><span>السعر</span><span>الخصم</span><span>الإجمالي</span><span></span></div>';
+  return head+cr.map((l,i)=>`<div class="ix-row"><div class="ix-name"><b>${e(by(C.products,l.product_id).name)}</b></div>
+    <div class="ix-stepper sm"><button type="button" onclick="invQty('${k}',${i},-1)">−</button><input type="number" value="${l.qty}" inputmode="decimal" onchange="invSetQty('${k}',${i},this.value)"><button type="button" onclick="invQty('${k}',${i},1)">+</button></div>
+    <div class="ix-num">${fmt(l.price)}</div><div class="ix-num">${fmt(l.discount)}</div>
+    <div class="ix-total">${fmt(l.qty*l.price-l.discount)}</div>
+    <button type="button" class="ix-del" title="حذف" onclick="invDel('${k}',${i})">×</button></div>`).join('');
+}
+function invRedraw(k){
+  const box=document.getElementById('invCart');if(box)box.innerHTML=invCartList(k);
+  const c=document.getElementById('invCnt');if(c)c.textContent=(cart[k]||[]).length+' بند';
+  invSum(k);
+}
+function invQty(k,i,d){const l=cart[k][i];if(!l)return;l.qty=Math.max(1,+l.qty+d);invRedraw(k)}
+function invSetQty(k,i,val){const l=cart[k][i];if(!l)return;l.qty=Math.max(0.001,+val||1);invRedraw(k)}
+function invDel(k,i){cart[k].splice(i,1);invRedraw(k)}
+function invPayQuick(k,m){
+  const tot=(cart[k]||[]).reduce((a,l)=>a+l.qty*l.price-l.discount,0);
+  const net=Math.max(0,tot-n('ig'));
+  const val=m==='full'?net:m==='half'?net/2:0;
+  document.getElementById('ipd').value=Math.round(val*100)/100;
+  invSum(k);
+}
+function invMethod(m){
+  const h=document.getElementById('im');if(h)h.value=m;
+  document.querySelectorAll('#ixMethod button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+}
+function invNew(k){cart[k]=[];R('soft')}
 async function invoiceView(s){
   const k=s?'s':'p', cr=cart[k]||[];
   const who=s?C.customers:C.suppliers;
   const L=await g(s?'sales_invoice_balances':'purchase_invoice_balances','date');
   const finance=me&&(me.role==='admin'||me.role==='accountant');
-  const tot=cr.reduce((a,l)=>a+l.qty*l.price-l.discount,0);
-  const today=new Date().toISOString().slice(0,10);
-  const lines=cr.map((l,i)=>`<tr><td class="ln">${i+1}</td><td>${e(by(C.products,l.product_id).name)}</td><td class="num">${l.qty}</td><td class="num">${fmt(l.price)}</td><td class="num">${fmt(l.discount)}</td><td class="num">${fmt(l.qty*l.price-l.discount)}</td><td class="num"><button class="danger sm" onclick="cart.${k}.splice(${i},1);R()">حذف</button></td></tr>`);
-  for(let i=cr.length;i<6;i++)lines.push(`<tr><td class="ln">${i+1}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
-  const entry=`<tr class="entry"><td class="ln">+</td><td><select id="il">${O(C.products.filter(p=>p.active))}</select></td><td class="num"><input id="iq" type="number" value="1"></td><td class="num"><input id="ir" type="number" placeholder="تلقائي"></td><td class="num"><input id="id" type="number" value="0"></td><td class="num"></td><td class="num"><button class="btn sm" onclick="addLine('${k}')">إضافة</button></td></tr>`;
-  const payFields=finance
-    ?`<label class="doc-f">المدفوع<input id="ipd" type="number" value="0" oninput="invSum('${k}')"></label><label class="doc-f">الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label><label class="doc-f">طريقة الدفع<select id="im"><option value="credit">آجل / جزء آجل</option><option value="cash">نقدي</option><option value="bank">بنك</option><option value="wallet">محفظة</option></select></label>`
-    :`<div class="doc-box" style="grid-column:1/-1"><span>ملاحظة</span><b style="font-weight:600;font-size:13px">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</b></div>`;
+  const payBox=finance
+    ?`<div class="ix-seg" id="ixMethod">
+        <button type="button" class="on" data-m="credit" onclick="invMethod('credit')">آجل</button>
+        <button type="button" data-m="cash" onclick="invMethod('cash')">نقدي</button>
+        <button type="button" data-m="bank" onclick="invMethod('bank')">بنك</button>
+        <button type="button" data-m="wallet" onclick="invMethod('wallet')">محفظة</button>
+      </div>
+      <input type="hidden" id="im" value="credit">
+      <label class="ix-field">المدفوع الآن<input id="ipd" type="number" value="0" inputmode="decimal" oninput="invSum('${k}')"></label>
+      <div class="ix-chips"><button type="button" onclick="invPayQuick('${k}','zero')">آجل بالكامل</button><button type="button" onclick="invPayQuick('${k}','half')">نصف المبلغ</button><button type="button" onclick="invPayQuick('${k}','full')">دفع كامل</button></div>
+      <label class="ix-field">الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label>`
+    :`<p class="ix-note">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</p><input type="hidden" id="im" value="credit"><input type="hidden" id="ipd" value="0"><input type="hidden" id="ia" value="">`;
   const rows=L.slice().reverse().map(x=>{
     const party=(by(who,s?x.customer_id:x.supplier_id).name)||'—';
     const [st,cls]=invStatus(x);
     return `<tr data-s="${e((x.number+' '+party).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(party)}</td><td>${fmt(x.total)}</td><td>${fmt(x.allocated_paid)}</td><td>${fmt(x.outstanding)}</td><td><span class="chip ${cls}">${st}</span></td><td><button class="btn soft sm" onclick="printInvoice('${x.id}',${s})">طباعة</button></td></tr>`;
   }).join('');
-  return `${sectionHead(s?'فاتورة بيع':'فاتورة شراء', s?'أدخل بيانات الفاتورة والبنود ثم احفظ.':'سجّل فاتورة الشراء والبنود ثم احفظ.')}
-  <div class="doc-bar">
-    <button class="btn" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ</button>
-    <button class="btn soft" onclick="cart.${k}=[];R()">فاتورة جديدة</button>
-    <button class="btn soft" onclick="R()">تحديث</button>
-    <button class="btn soft" onclick="go('dash')">إغلاق</button>
-  </div>
-  <div class="card np doc-head">
-    <div class="doc-box"><span>رقم الفاتورة</span><b>يُولَّد عند الحفظ</b></div>
-    <div class="doc-box"><span>التاريخ</span><b>${today}</b></div>
-    <div class="doc-box"><span>الحالة</span><b id="docStatus">آجلة</b></div>
-    <label class="doc-f">${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
-    <label class="doc-f">المخزن<select id="iw">${O(C.warehouses)}</select></label>
-    ${payFields}
-  </div>
-  <div class="card np">
-    <div class="table-wrap"><table class="doc-grid">
-      <thead><tr><th class="ln">#</th><th>الصنف</th><th class="num">الكمية</th><th class="num">السعر</th><th class="num">الخصم</th><th class="num">الإجمالي</th><th class="num"></th></tr></thead>
-      <tbody>${lines.join('')}${entry}</tbody>
-    </table></div>
-    <div class="doc-tiles">
-      <div class="tile"><span>المجموع</span><b id="invSub">${fmt(tot)}</b></div>
-      <div class="tile"><span>خصم كلي على الفاتورة</span><input id="ig" type="number" value="0" oninput="invSum('${k}')"></div>
-      <div class="tile"><span>الصافي</span><b id="invNet">${fmt(tot)}</b></div>
-      <div class="tile"><span>المدفوع</span><b id="invPaid">${fmt(0)}</b></div>
-      <div class="tile"><span>المتبقي</span><b id="invRem">${fmt(tot)}</b></div>
+  return `${sectionHead(s?'فاتورة بيع جديدة':'فاتورة شراء جديدة', 'اختار الطرف، ضيف الأصناف، ثم راجع المبلغ واحفظ.')}
+  <div class="ix">
+    <div class="ix-main">
+      <section class="ix-card">
+        <div class="ix-step"><span>1</span><b>${s?'العميل':'المورد'} والمخزن</b></div>
+        <div class="ix-grid2">
+          <label class="ix-field">${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
+          <label class="ix-field">المخزن<select id="iw">${O(C.warehouses)}</select></label>
+        </div>
+      </section>
+      <section class="ix-card">
+        <div class="ix-step"><span>2</span><b>إضافة الأصناف</b></div>
+        <div class="ix-search">
+          <input id="invQ" type="search" placeholder="ابحث بالاسم أو الكود أو الباركود، واضغط Enter" autocomplete="off" oninput="invSearch('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();invPickFirst('${k}')}">
+          <div id="invRes" class="ix-results"></div>
+        </div>
+        <input type="hidden" id="il" value="">
+        <div id="invSel"></div>
+      </section>
+      <section class="ix-card">
+        <div class="ix-step"><span>3</span><b>بنود الفاتورة</b><em id="invCnt">${cr.length} بند</em></div>
+        <div id="invCart">${invCartList(k)}</div>
+      </section>
     </div>
-    <p class="muted inv-note">الضريبة تُحسب حسب إعدادات الشركة عند الحفظ.</p>
+    <aside class="ix-side">
+      <div class="ix-sum">
+        <div class="ix-line"><span>مجموع البنود</span><b id="invSub">${fmt(0)}</b></div>
+        <label class="ix-field">خصم على الفاتورة كلها<input id="ig" type="number" value="0" inputmode="decimal" oninput="invSum('${k}')"></label>
+        <div class="ix-net"><span>الإجمالي المطلوب</span><b id="invNet">${fmt(0)}</b></div>
+        ${payBox}
+        <div class="ix-line"><span>المدفوع</span><b id="invPaid">${fmt(0)}</b></div>
+        <div class="ix-line"><span>المتبقي</span><b id="invRem">${fmt(0)}</b></div>
+        <div class="ix-line"><span>الحالة</span><b id="docStatus">آجلة</b></div>
+        <button class="ix-save" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ الفاتورة</button>
+        <button class="ix-ghost" onclick="invNew('${k}')">فاتورة جديدة</button>
+      </div>
+    </aside>
   </div>
   <div class="card">
     <div class="card-title"><b>الفواتير السابقة</b><input class="inv-search" placeholder="بحث بالرقم أو الاسم" oninput="invFilter(this.value)"></div>
@@ -738,6 +818,61 @@ async function printInvoice(id,s){
 .inv-table{width:100%;border-collapse:collapse}
 .inv-table th{background:#f8fafc;color:#667085;font-size:12px;text-align:right;padding:10px}
 .inv-table td{padding:10px;border-top:1px solid #f0f2f5}
+.ix{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;margin-bottom:18px}
+@media(max-width:980px){.ix{grid-template-columns:1fr}}
+.ix-main{display:grid;gap:14px;min-width:0}
+.ix-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.ix-step{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ix-step span{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.ix-step b{font-size:15px}
+.ix-step em{margin-inline-start:auto;font-style:normal;color:var(--muted);font-size:12px}
+.ix-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.ix-grid2{grid-template-columns:1fr}}
+.ix-field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);font-weight:700}
+.ix-field input,.ix-field select,.ix-search input{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;color:var(--ink);font-size:15px}
+.ix-field input:focus,.ix-field select:focus,.ix-search input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+.ix-search input{padding:13px 14px;font-size:16px}
+.ix-results{display:grid;gap:6px;margin-top:8px}
+.ix-res{display:flex;flex-direction:column;align-items:flex-start;text-align:right;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;color:var(--ink);width:100%}
+.ix-res:hover{border-color:var(--blue);background:#eff6ff}
+.ix-res small,.ix-selbox small{color:var(--muted);font-size:12px}
+.ix-selbox{margin-top:12px;border:1px dashed #93c5fd;background:#eff6ff;border-radius:14px;padding:14px;display:grid;gap:12px}
+.ix-selbox>div:first-child b{display:block}
+.ix-selctl{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:10px;align-items:end}
+@media(max-width:700px){.ix-selctl{grid-template-columns:1fr 1fr}}
+.ix-add{border:0;background:var(--blue);color:#fff;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer;height:44px;white-space:nowrap}
+.ix-add:hover{background:var(--blue2)}
+.ix-stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;height:44px}
+.ix-stepper button{width:40px;height:100%;border:0;background:#f8fafc;cursor:pointer;font-size:18px;color:var(--ink)}
+.ix-stepper input{width:72px;height:100%;border:0;text-align:center;font-size:15px;font-weight:700;background:#fff;color:var(--ink);padding:0}
+.ix-stepper input:focus{outline:none}
+.ix-stepper.sm{height:38px}
+.ix-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 110px 36px;gap:10px;align-items:center;padding:12px 0;border-top:1px solid #f0f2f5}
+.ix-head{border-top:0;padding:0 0 6px;font-size:12px;color:var(--muted);font-weight:700}
+.ix-head span:nth-child(n+2){text-align:center}
+@media(max-width:800px){.ix-row,.ix-head{grid-template-columns:1fr 1fr;row-gap:8px}.ix-head{display:none}}
+.ix-name b{display:block}
+.ix-num{font-size:13px;color:var(--muted);text-align:center}
+.ix-total{font-weight:800;text-align:left}
+.ix-del{width:34px;height:34px;border-radius:50%;border:0;background:#fef2f2;color:var(--red);cursor:pointer;font-size:18px;line-height:1}
+.ix-empty{text-align:center;color:var(--muted);padding:26px 0;border:1px dashed var(--line);border-radius:14px}
+.ix-side{position:sticky;top:84px}
+.ix-sum{background:#101828;color:#fff;border-radius:var(--radius);padding:18px;display:grid;gap:12px}
+.ix-sum .ix-field{color:#98a2b3}
+.ix-sum .ix-field input{background:#1d2939;border-color:#344054;color:#fff}
+.ix-line{display:flex;justify-content:space-between;color:#d0d5dd}
+.ix-net{display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:14px;background:#1d2939;color:#98a2b3}
+.ix-net b{font-size:22px;color:#fff}
+.ix-seg{display:grid;grid-template-columns:repeat(4,1fr);background:#1d2939;border-radius:12px;padding:4px;gap:4px}
+.ix-seg button{border:0;background:transparent;color:#98a2b3;border-radius:9px;padding:8px 4px;cursor:pointer;font-weight:700;font-size:13px}
+.ix-seg button.on{background:#fff;color:#101828}
+.ix-chips{display:flex;gap:6px;flex-wrap:wrap}
+.ix-chips button{border:1px solid #344054;background:transparent;color:#d0d5dd;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer}
+.ix-save{border:0;background:var(--blue);color:#fff;border-radius:14px;padding:14px;font-size:16px;font-weight:800;cursor:pointer}
+.ix-save:hover{background:var(--blue2)}
+.ix-ghost{border:1px solid #344054;background:transparent;color:#d0d5dd;border-radius:14px;padding:10px;cursor:pointer}
+.ix-note{color:var(--muted);font-size:12px;margin:0}
+.ix-sum .ix-note{color:#98a2b3}
 .doc-bar{display:flex;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e4e7ec;border-radius:10px;padding:8px;margin-bottom:12px;position:sticky;top:0;z-index:2}
 .doc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
 .doc-f{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#667085;font-weight:700}
