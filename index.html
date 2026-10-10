@@ -133,6 +133,8 @@ html,body{overflow-x:hidden}.login-page{min-height:100dvh;width:100%;display:gri
 .btn{transition:transform .15s ease,box-shadow .2s ease,background .2s ease}
 .btn:active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){.pg-in,.btn,.card,.sidebtn{animation:none!important;transition:none!important}}
+.page-loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:70px 0}.pl-spin{width:34px;height:34px;border:3px solid #e5e9f0;border-top-color:var(--blue,#2563eb);border-radius:50%;animation:spin .75s linear infinite}
+.app-version{margin-top:28px;text-align:center;color:#98a2b3;font-size:12px}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"></head>
 <body><div id="app"></div><div id="globalLoader" aria-live="polite"><div class="loader-card"><div class="loader-ring"></div><b id="loaderTitle">جاري التحميل...</b><div class="muted" id="loaderText">من فضلك انتظر</div></div></div><div id="toast" class="toast"></div>
@@ -164,9 +166,10 @@ function withLoading(fn,title='جاري المعالجة...',text='يتم حفظ
   _loaderTimer=setTimeout(()=>showLoader(title,text),180);
   return Promise.resolve().then(fn).finally(()=>hideLoader());
 }
-function goBack(){const p=(window._nav||[]).pop();if(!p)return;view=p;localStorage.setItem('erp_v_view',p);closeMobileNav?.();return withLoading(()=>R('soft'),'جاري الرجوع...','جارٍ تحميل البيانات')}
+function goBack(){const p=(window._nav||[]).pop();if(!p)return;view=p;localStorage.setItem('erp_v_view',p);closeMobileNav?.();showPlaceholder();return R('soft')}
 function toast(msg){const t=$('#toast');if(!t)return;t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
-function go(vw){if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();return withLoading(()=>R('soft'),`جاري فتح ${NAV.find(x=>x[0]===vw)?.[1]||'الصفحة'}...`,'جارٍ تحميل البيانات')}
+function showPlaceholder(){const pg=document.querySelector('.page');if(pg)pg.innerHTML='<div class="page-loading"><div class="pl-spin"></div><p class="muted">جاري فتح الصفحة...</p></div>'}
+function go(vw){if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();showPlaceholder();return R('soft')}
 
 const P={admin:'*',accountant:['dash','prod','cust','supp','sales','purch','po','grn','dn','pay','exp','cash','trf','ret','quo','ord','stmt','emp','prl','asset','bank','price','rep','jr','stk','period','appr','chk','comm','taxdoc','org','health','audit'],sales:['dash','prod','cust','sales','dn','ret','quo','ord','stmt','price','comm','taxdoc','appr'],store:['dash','prod','purch','po','grn','dn','ret','trf','stk','mfg']};
 const canBase=x=>me&&(P[me.role]==='*'||P[me.role].includes(x));
@@ -187,7 +190,7 @@ async function loadAll(soft){
   const finance=me&&(me.role==='admin'||me.role==='accountant');
   const cached=k=>{try{return JSON.parse(localStorage.getItem('erp_cache_'+k)||'null')}catch{return null}};
   const saveCache=!soft||Date.now()-(window._lastCacheWrite||0)>300000;
-  const safe=async(k,fn)=>{try{const x=await fn();if(saveCache)localStorage.setItem('erp_cache_'+k,JSON.stringify(x));return x}catch(err){const x=cached(k);if(x)return x;throw err}};
+  const safe=async(k,fn)=>{try{const x=await fn();if(saveCache){try{localStorage.setItem('erp_cache_'+k,JSON.stringify(x))}catch(_){}}return x}catch(err){const x=cached(k);if(x)return x;throw err}};
   const[products,customers,suppliers,warehouses,accts,stock,cb,sbal]=await Promise.all([
     safe('products',()=>g('products','name')),safe('customers',()=>g('customers','name')),safe('suppliers',()=>g('suppliers','name')),safe('warehouses',()=>g('warehouses','name')),finance?safe('cash_accounts',()=>g('cash_accounts','name')):Promise.resolve([]),safe('stock',()=>g('stock_balances')),safe('cb',()=>g('customer_balances')),safe('sbal',()=>g('supplier_balances'))]);
   if(saveCache)window._lastCacheWrite=Date.now();
@@ -502,7 +505,11 @@ async function R(q){
   if(!me.active){return _inactiveScreen()}
   if(!can(view))view='dash';
   localStorage.setItem('erp_v_view',view);
+  if(!C){const c=readCachedC();if(c){C=c;await paintView(q)}}
   await loadAll(q==='soft'||q===1);
+  await paintView(q);
+}
+async function paintView(q){
   let h='';
   try{
     if(view==='dash')h=await dash(); else if(view==='po')h=await poView(); else if(view==='grn')h=await grnView(); else if(view==='dn')h=await dnView();
@@ -511,7 +518,7 @@ async function R(q){
     else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='rep')h=await reportsView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
     else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
-    if(view==='dash')h=quickBar()+h;
+    if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
     if(view!=='dash'){const back=(window._nav&&window._nav.length)?'<button class="btn s" onclick="goBack()">↩ رجوع</button>':'';h=`<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">${back}<button class="btn s" onclick="go('dash')">🏠 الرئيسية</button></div>`+h}
   }catch(x){h=`<div class="card error-card"><b>تعذر تحميل الصفحة</b><p>${e(x.message||x)}</p></div>`}
   const links=renderNavGroups();
@@ -524,6 +531,7 @@ async function R(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
+const APP_VERSION='v1.27';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -541,12 +549,13 @@ async function saveQuick(){
 function bottomNav(){return NAV.filter(x=>can(x[0])).filter(x=>['dash','sales','purch','pay','trace'].includes(x[0])).map(x=>`<button class="${view===x[0]?'active':''}" onclick="go('${x[0]}')">${x[1]}</button>`).join('')}
 let _qTimer=null;
 function qSearch(el){window._q=el.value;clearTimeout(_qTimer);_qTimer=setTimeout(()=>{R(1).then(()=>{const q=document.getElementById('q');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}})},250)}
+function readCachedC(){const r=k=>{try{return JSON.parse(localStorage.getItem('erp_cache_'+k)||'null')}catch{return null}};const products=r('products'),customers=r('customers'),suppliers=r('suppliers'),warehouses=r('warehouses'),stock=r('stock'),cb=r('cb'),sbal=r('sbal');if(!products||!customers||!suppliers||!warehouses||!stock||!cb||!sbal)return null;return{products,customers,suppliers,warehouses,accts:r('cash_accounts')||[],stock,cb,sbal}}
 function _loginScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>تسجيل الدخول</h2><p class="login-sub">ادخل إلى لوحة إدارة الشركة</p><div class="login-field"><label for="lu">البريد الإلكتروني</label><input id="lu" type="email" autocomplete="email" placeholder="name@company.com"></div><div class="login-field"><label for="lp">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="login-actions"><button class="btn" style="width:100%;min-height:48px" onclick="login()">دخول</button><button class="btn soft" style="width:100%;min-height:48px" onclick="signup()">إنشاء حساب جديد</button></div><p class="login-note">الحساب الأول في المشروع الجديد يُنشأ كمدير حسب إعدادات قاعدة البيانات.</p></section></div>`}
 function _inactiveScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>الحساب بانتظار التفعيل</h2><p class="login-sub">سيتطلب الحساب تفعيل المدير قبل استخدام النظام.</p><button class="btn" style="width:100%;min-height:48px" onclick="logout()">خروج</button></section></div>`}
 async function login(){return withLoading(async()=>{const{error}=await sb.auth.signInWithPassword({email:v('lu'),password:v('lp')});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
 async function signup(){return withLoading(async()=>{const{error}=await sb.auth.signUp({email:v('lu'),password:v('lp')});if(error)throw error;alert('تم إنشاء الحساب. أكد البريد إذا كان التأكيد مفعلاً.')},'جاري إنشاء الحساب...','جارٍ تجهيز حسابك')}
 async function logout(){return withLoading(async()=>{await sb.auth.signOut();me=null;localStorage.removeItem('erp_v_view');view='dash';await R()},'جاري تسجيل الخروج...','جارٍ إنهاء الجلسة بأمان')}
-async function boot(){const{data:{user}}=await sb.auth.getUser();me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await loadMyPermissions();if(me)await loadQuick();await R()}
+async function boot(){const{data:{user}}=await sb.auth.getUser();me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMobileNav()});
 window.addEventListener('pageshow',()=>{ hideLoader(); });
 window.addEventListener('unhandledrejection',()=>{ if(_loading) hideLoader(); });
