@@ -541,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.31';
+const APP_VERSION='v1.32';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -629,132 +629,108 @@ function invFilter(q){
   q=(q||'').trim().toLowerCase();
   document.querySelectorAll('#invBody tr').forEach(r=>{r.style.display=(!q||(r.dataset.s||'').includes(q))?'':'none'});
 }
-// --- v1.31: شاشة إدخال الفاتورة الجديدة (خطوات واضحة، بحث سريع، بدون إعادة تحميل) ---
+// --- v1.32: شاشة فاتورة بشكل المستند (زي البرنامج المكتبي): هيدر، جدول بنود قابل للتعديل، إجماليات، أزرار ---
 function invSearch(k,q){
   const box=document.getElementById('invRes');if(!box)return;
   q=(q||'').trim().toLowerCase();
   if(!q){box.innerHTML='';return}
   const list=C.products.filter(p=>p.active&&[p.name,p.code,p.barcode].join(' ').toLowerCase().includes(q)).slice(0,8);
-  box.innerHTML=list.length?list.map(p=>`<button type="button" class="ix-res" onclick="invPick('${k}','${p.id}')"><b>${e(p.name)}</b><small>${e(p.code||'بدون كود')} · السعر ${fmt(k==='s'?p.sale_price:p.purchase_price)} · مخزون ${stkQty(p.id)}</small></button>`).join(''):'<div class="ix-note">لا توجد أصناف مطابقة</div>';
+  box.innerHTML=list.length?list.map(p=>`<button type="button" class="doc-res-item" onclick="invPick('${k}','${p.id}')"><b>${e(p.name)}</b><small>${e(p.code||'بدون كود')} · السعر ${fmt(k==='s'?p.sale_price:p.purchase_price)} · مخزون ${stkQty(p.id)}</small></button>`).join(''):'<div class="doc-res-empty">لا توجد أصناف مطابقة</div>';
 }
-function invPickFirst(k){const b=document.querySelector('#invRes .ix-res');if(b)b.click()}
+function invPickFirst(k){const b=document.querySelector('#invRes .doc-res-item');if(b)b.click()}
 function invPick(k,id){
   const p=by(C.products,id);if(!p.id)return;
-  document.getElementById('il').value=id;
-  const def=k==='s'?p.sale_price:p.purchase_price;
+  const same=(cart[k]||[]).find(l=>l.product_id===p.id);
+  if(same)same.qty=+same.qty+1;
+  else cart[k].push({product_id:p.id,qty:1,price:+(k==='s'?p.sale_price:p.purchase_price)||0,discount:0});
+  const q=document.getElementById('invQ');if(q){q.value='';q.focus()}
   document.getElementById('invRes').innerHTML='';
-  document.getElementById('invQ').value='';
-  document.getElementById('invSel').innerHTML=`<div class="ix-selbox"><div><b>${e(p.name)}</b><small>السعر الافتراضي ${fmt(def)} · مخزون ${stkQty(p.id)}</small></div>
-    <div class="ix-selctl">
-      <div class="ix-field"><span>الكمية</span><div class="ix-stepper"><button type="button" onclick="invStep(-1)">−</button><input id="iq" type="number" value="1" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();invAdd('${k}')}"><button type="button" onclick="invStep(1)">+</button></div></div>
-      <label class="ix-field">السعر<input id="ir" type="number" inputmode="decimal" placeholder="${fmt(def)}"></label>
-      <label class="ix-field">الخصم<input id="id" type="number" value="0" inputmode="decimal"></label>
-      <button type="button" class="ix-add" onclick="invAdd('${k}')">إضافة للفاتورة</button>
-    </div></div>`;
-  const q=document.getElementById('iq');if(q){q.focus();q.select()}
-}
-function invStep(d){const q=document.getElementById('iq');if(!q)return;q.value=Math.max(1,(+q.value||0)+d)}
-function invAdd(k){
-  const p=by(C.products,v('il'));
-  const q=n('iq'),pr=n('ir')||(k==='s'?p.sale_price:p.purchase_price),d=n('id');
-  if(!p.id)return toast('اختر صنفاً أولاً');
-  if(!(q>0))return toast('الكمية لازم تكون أكبر من صفر');
-  if(pr<0)return toast('السعر غير صحيح');
-  cart[k].push({product_id:p.id,qty:q,price:+pr,discount:d});
-  document.getElementById('il').value='';
-  document.getElementById('invSel').innerHTML='';
   invRedraw(k);
-  document.getElementById('invQ').focus();
 }
-function invCartList(k){
+function invRowsHtml(k){
   const cr=cart[k]||[];
-  if(!cr.length)return '<div class="ix-empty">لم تُضف أصناف بعد. ابحث عن صنف فوق وأضفه.</div>';
-  const head='<div class="ix-row ix-head"><span>الصنف</span><span>الكمية</span><span>السعر</span><span>الخصم</span><span>الإجمالي</span><span></span></div>';
-  return head+cr.map((l,i)=>`<div class="ix-row"><div class="ix-name"><b>${e(by(C.products,l.product_id).name)}</b></div>
-    <div class="ix-stepper sm"><button type="button" onclick="invQty('${k}',${i},-1)">−</button><input type="number" value="${l.qty}" inputmode="decimal" onchange="invSetQty('${k}',${i},this.value)"><button type="button" onclick="invQty('${k}',${i},1)">+</button></div>
-    <div class="ix-num">${fmt(l.price)}</div><div class="ix-num">${fmt(l.discount)}</div>
-    <div class="ix-total">${fmt(l.qty*l.price-l.discount)}</div>
-    <button type="button" class="ix-del" title="حذف" onclick="invDel('${k}',${i})">×</button></div>`).join('');
+  if(!cr.length)return '<tr class="doc-empty"><td colspan="7">ابحث عن صنف فوق وهيتضاف هنا. تقدر تعدّل الكمية والسعر والخصم في نفس السطر.</td></tr>';
+  return cr.map((l,i)=>{const p=by(C.products,l.product_id);return `<tr>
+    <td class="c-n" data-label="#">${i+1}</td>
+    <td data-label="الصنف"><b>${e(p.name||'—')}</b><small>${e(p.code||'')}</small></td>
+    <td class="c-q" data-label="الكمية"><input type="number" value="${l.qty}" inputmode="decimal" onchange="invSet('${k}',${i},'qty',this.value)"></td>
+    <td class="c-p" data-label="السعر"><input type="number" value="${l.price}" inputmode="decimal" onchange="invSet('${k}',${i},'price',this.value)"></td>
+    <td class="c-d" data-label="الخصم"><input type="number" value="${l.discount}" inputmode="decimal" onchange="invSet('${k}',${i},'discount',this.value)"></td>
+    <td class="c-t" data-label="الإجمالي" id="lt${i}">${fmt(l.qty*l.price-l.discount)}</td>
+    <td class="c-x"><button type="button" class="doc-del" title="حذف" onclick="invDel('${k}',${i})">×</button></td></tr>`}).join('');
 }
 function invRedraw(k){
-  const box=document.getElementById('invCart');if(box)box.innerHTML=invCartList(k);
+  const b=document.getElementById('invRows');if(b)b.innerHTML=invRowsHtml(k);
   const c=document.getElementById('invCnt');if(c)c.textContent=(cart[k]||[]).length+' بند';
   invSum(k);
 }
-function invQty(k,i,d){const l=cart[k][i];if(!l)return;l.qty=Math.max(1,+l.qty+d);invRedraw(k)}
-function invSetQty(k,i,val){const l=cart[k][i];if(!l)return;l.qty=Math.max(0.001,+val||1);invRedraw(k)}
-function invDel(k,i){cart[k].splice(i,1);invRedraw(k)}
-function invPayQuick(k,m){
-  const tot=(cart[k]||[]).reduce((a,l)=>a+l.qty*l.price-l.discount,0);
-  const net=Math.max(0,tot-n('ig'));
-  const val=m==='full'?net:m==='half'?net/2:0;
-  document.getElementById('ipd').value=Math.round(val*100)/100;
+function invSet(k,i,f,val){
+  const l=cart[k][i];if(!l)return;
+  const x=Number(val);
+  if(f==='qty'){if(!(x>0)){invRedraw(k);return}l.qty=x}
+  else if(f==='price'){if(!(x>=0)){invRedraw(k);return}l.price=x}
+  else{l.discount=x>=0&&!isNaN(x)?x:0}
+  const t=document.getElementById('lt'+i);if(t)t.textContent=fmt(l.qty*l.price-l.discount);
   invSum(k);
 }
-function invMethod(m){
-  const h=document.getElementById('im');if(h)h.value=m;
-  document.querySelectorAll('#ixMethod button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
-}
+function invDel(k,i){cart[k].splice(i,1);invRedraw(k)}
 function invNew(k){cart[k]=[];R('soft')}
 async function invoiceView(s){
   const k=s?'s':'p', cr=cart[k]||[];
   const who=s?C.customers:C.suppliers;
   const L=await g(s?'sales_invoice_balances':'purchase_invoice_balances','date');
   const finance=me&&(me.role==='admin'||me.role==='accountant');
-  const payBox=finance
-    ?`<div class="ix-seg" id="ixMethod">
-        <button type="button" class="on" data-m="credit" onclick="invMethod('credit')">آجل</button>
-        <button type="button" data-m="cash" onclick="invMethod('cash')">نقدي</button>
-        <button type="button" data-m="bank" onclick="invMethod('bank')">بنك</button>
-        <button type="button" data-m="wallet" onclick="invMethod('wallet')">محفظة</button>
-      </div>
-      <input type="hidden" id="im" value="credit">
-      <label class="ix-field">المدفوع الآن<input id="ipd" type="number" value="0" inputmode="decimal" oninput="invSum('${k}')"></label>
-      <div class="ix-chips"><button type="button" onclick="invPayQuick('${k}','zero')">آجل بالكامل</button><button type="button" onclick="invPayQuick('${k}','half')">نصف المبلغ</button><button type="button" onclick="invPayQuick('${k}','full')">دفع كامل</button></div>
-      <label class="ix-field">الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label>`
-    :`<p class="ix-note">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</p><input type="hidden" id="im" value="credit"><input type="hidden" id="ipd" value="0"><input type="hidden" id="ia" value="">`;
+  const tot=cr.reduce((a,l)=>a+l.qty*l.price-l.discount,0);
+  const today=new Date().toISOString().slice(0,10);
+  const payFields=finance
+    ?`<label class="df">المدفوع<input id="ipd" type="number" value="0" inputmode="decimal" oninput="invSum('${k}')"></label>
+      <label class="df">الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label>
+      <label class="df">طريقة الدفع<select id="im"><option value="credit">آجل / جزء آجل</option><option value="cash">نقدي</option><option value="bank">بنك</option><option value="wallet">محفظة</option></select></label>`
+    :`<div class="df wide"><span>ملاحظة</span><b class="note">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</b></div><input type="hidden" id="ipd" value="0"><input type="hidden" id="im" value="credit"><input type="hidden" id="ia" value="">`;
   const rows=L.slice().reverse().map(x=>{
     const party=(by(who,s?x.customer_id:x.supplier_id).name)||'—';
     const [st,cls]=invStatus(x);
     return `<tr data-s="${e((x.number+' '+party).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(party)}</td><td>${fmt(x.total)}</td><td>${fmt(x.allocated_paid)}</td><td>${fmt(x.outstanding)}</td><td><span class="chip ${cls}">${st}</span></td><td><button class="btn soft sm" onclick="printInvoice('${x.id}',${s})">طباعة</button></td></tr>`;
   }).join('');
-  return `${sectionHead(s?'فاتورة بيع جديدة':'فاتورة شراء جديدة', 'اختار الطرف، ضيف الأصناف، ثم راجع المبلغ واحفظ.')}
-  <div class="ix">
-    <div class="ix-main">
-      <section class="ix-card">
-        <div class="ix-step"><span>1</span><b>${s?'العميل':'المورد'} والمخزن</b></div>
-        <div class="ix-grid2">
-          <label class="ix-field">${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
-          <label class="ix-field">المخزن<select id="iw">${O(C.warehouses)}</select></label>
-        </div>
-      </section>
-      <section class="ix-card">
-        <div class="ix-step"><span>2</span><b>إضافة الأصناف</b></div>
-        <div class="ix-search">
-          <input id="invQ" type="search" placeholder="ابحث بالاسم أو الكود أو الباركود، واضغط Enter" autocomplete="off" oninput="invSearch('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();invPickFirst('${k}')}">
-          <div id="invRes" class="ix-results"></div>
-        </div>
-        <input type="hidden" id="il" value="">
-        <div id="invSel"></div>
-      </section>
-      <section class="ix-card">
-        <div class="ix-step"><span>3</span><b>بنود الفاتورة</b><em id="invCnt">${cr.length} بند</em></div>
-        <div id="invCart">${invCartList(k)}</div>
-      </section>
-    </div>
-    <aside class="ix-side">
-      <div class="ix-sum">
-        <div class="ix-line"><span>مجموع البنود</span><b id="invSub">${fmt(0)}</b></div>
-        <label class="ix-field">خصم على الفاتورة كلها<input id="ig" type="number" value="0" inputmode="decimal" oninput="invSum('${k}')"></label>
-        <div class="ix-net"><span>الإجمالي المطلوب</span><b id="invNet">${fmt(0)}</b></div>
-        ${payBox}
-        <div class="ix-line"><span>المدفوع</span><b id="invPaid">${fmt(0)}</b></div>
-        <div class="ix-line"><span>المتبقي</span><b id="invRem">${fmt(0)}</b></div>
-        <div class="ix-line"><span>الحالة</span><b id="docStatus">آجلة</b></div>
-        <button class="ix-save" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ الفاتورة</button>
-        <button class="ix-ghost" onclick="invNew('${k}')">فاتورة جديدة</button>
+  return `<div class="doc">
+    <div class="doc-toolbar">
+      <div class="doc-title"><b>${s?'فاتورة بيع':'فاتورة شراء'}</b><span>رقم يتولد عند الحفظ</span></div>
+      <div class="doc-actions">
+        <button type="button" class="doc-btn primary" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ</button>
+        <button type="button" class="doc-btn" onclick="invNew('${k}')">فاتورة جديدة</button>
+        <button type="button" class="doc-btn" onclick="R('soft')">تحديث</button>
+        <button type="button" class="doc-btn" onclick="go('dash')">إغلاق</button>
       </div>
-    </aside>
+    </div>
+    <div class="doc-head">
+      <label class="df">${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
+      <label class="df">المخزن<select id="iw">${O(C.warehouses)}</select></label>
+      <div class="df"><span>التاريخ</span><b>${today}</b></div>
+      <div class="df"><span>الحالة</span><b id="docStatus">آجلة</b></div>
+      ${payFields}
+    </div>
+    <div class="doc-add">
+      <div class="doc-search">
+        <input id="invQ" type="search" placeholder="ابحث عن صنف بالاسم أو الكود أو الباركود، واضغط Enter" autocomplete="off" oninput="invSearch('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();invPickFirst('${k}')}">
+        <div id="invRes" class="doc-res"></div>
+      </div>
+    </div>
+    <div class="doc-grid-wrap">
+      <table class="doc-tbl">
+        <thead><tr><th class="c-n">#</th><th>الصنف</th><th class="c-q">الكمية</th><th class="c-p">السعر</th><th class="c-d">الخصم</th><th class="c-t">الإجمالي</th><th class="c-x"></th></tr></thead>
+        <tbody id="invRows">${invRowsHtml(k)}</tbody>
+      </table>
+    </div>
+    <div class="doc-foot">
+      <span class="doc-count" id="invCnt">${cr.length} بند</span>
+      <div class="doc-totals">
+        <div class="tl"><span>المجموع</span><b id="invSub">${fmt(tot)}</b></div>
+        <div class="tl"><span>خصم كلي</span><input id="ig" type="number" value="0" inputmode="decimal" oninput="invSum('${k}')"></div>
+        <div class="tl"><span>الصافي</span><b id="invNet">${fmt(tot)}</b></div>
+        <div class="tl"><span>المدفوع</span><b id="invPaid">${fmt(0)}</b></div>
+        <div class="tl big"><span>المتبقي</span><b id="invRem">${fmt(tot)}</b></div>
+      </div>
+    </div>
   </div>
   <div class="card">
     <div class="card-title"><b>الفواتير السابقة</b><input class="inv-search" placeholder="بحث بالرقم أو الاسم" oninput="invFilter(this.value)"></div>
@@ -818,61 +794,70 @@ async function printInvoice(id,s){
 .inv-table{width:100%;border-collapse:collapse}
 .inv-table th{background:#f8fafc;color:#667085;font-size:12px;text-align:right;padding:10px}
 .inv-table td{padding:10px;border-top:1px solid #f0f2f5}
-.ix{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;margin-bottom:18px}
-@media(max-width:980px){.ix{grid-template-columns:1fr}}
-.ix-main{display:grid;gap:14px;min-width:0}
-.ix-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
-.ix-step{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.ix-step span{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
-.ix-step b{font-size:15px}
-.ix-step em{margin-inline-start:auto;font-style:normal;color:var(--muted);font-size:12px}
-.ix-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:600px){.ix-grid2{grid-template-columns:1fr}}
-.ix-field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);font-weight:700}
-.ix-field input,.ix-field select,.ix-search input{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;color:var(--ink);font-size:15px}
-.ix-field input:focus,.ix-field select:focus,.ix-search input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(37,99,235,.12)}
-.ix-search input{padding:13px 14px;font-size:16px}
-.ix-results{display:grid;gap:6px;margin-top:8px}
-.ix-res{display:flex;flex-direction:column;align-items:flex-start;text-align:right;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;color:var(--ink);width:100%}
-.ix-res:hover{border-color:var(--blue);background:#eff6ff}
-.ix-res small,.ix-selbox small{color:var(--muted);font-size:12px}
-.ix-selbox{margin-top:12px;border:1px dashed #93c5fd;background:#eff6ff;border-radius:14px;padding:14px;display:grid;gap:12px}
-.ix-selbox>div:first-child b{display:block}
-.ix-selctl{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:10px;align-items:end}
-@media(max-width:700px){.ix-selctl{grid-template-columns:1fr 1fr}}
-.ix-add{border:0;background:var(--blue);color:#fff;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer;height:44px;white-space:nowrap}
-.ix-add:hover{background:var(--blue2)}
-.ix-stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;height:44px}
-.ix-stepper button{width:40px;height:100%;border:0;background:#f8fafc;cursor:pointer;font-size:18px;color:var(--ink)}
-.ix-stepper input{width:72px;height:100%;border:0;text-align:center;font-size:15px;font-weight:700;background:#fff;color:var(--ink);padding:0}
-.ix-stepper input:focus{outline:none}
-.ix-stepper.sm{height:38px}
-.ix-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 90px 90px 110px 36px;gap:10px;align-items:center;padding:12px 0;border-top:1px solid #f0f2f5}
-.ix-head{border-top:0;padding:0 0 6px;font-size:12px;color:var(--muted);font-weight:700}
-.ix-head span:nth-child(n+2){text-align:center}
-@media(max-width:800px){.ix-row,.ix-head{grid-template-columns:1fr 1fr;row-gap:8px}.ix-head{display:none}}
-.ix-name b{display:block}
-.ix-num{font-size:13px;color:var(--muted);text-align:center}
-.ix-total{font-weight:800;text-align:left}
-.ix-del{width:34px;height:34px;border-radius:50%;border:0;background:#fef2f2;color:var(--red);cursor:pointer;font-size:18px;line-height:1}
-.ix-empty{text-align:center;color:var(--muted);padding:26px 0;border:1px dashed var(--line);border-radius:14px}
-.ix-side{position:sticky;top:84px}
-.ix-sum{background:#101828;color:#fff;border-radius:var(--radius);padding:18px;display:grid;gap:12px}
-.ix-sum .ix-field{color:#98a2b3}
-.ix-sum .ix-field input{background:#1d2939;border-color:#344054;color:#fff}
-.ix-line{display:flex;justify-content:space-between;color:#d0d5dd}
-.ix-net{display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:14px;background:#1d2939;color:#98a2b3}
-.ix-net b{font-size:22px;color:#fff}
-.ix-seg{display:grid;grid-template-columns:repeat(4,1fr);background:#1d2939;border-radius:12px;padding:4px;gap:4px}
-.ix-seg button{border:0;background:transparent;color:#98a2b3;border-radius:9px;padding:8px 4px;cursor:pointer;font-weight:700;font-size:13px}
-.ix-seg button.on{background:#fff;color:#101828}
-.ix-chips{display:flex;gap:6px;flex-wrap:wrap}
-.ix-chips button{border:1px solid #344054;background:transparent;color:#d0d5dd;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer}
-.ix-save{border:0;background:var(--blue);color:#fff;border-radius:14px;padding:14px;font-size:16px;font-weight:800;cursor:pointer}
-.ix-save:hover{background:var(--blue2)}
-.ix-ghost{border:1px solid #344054;background:transparent;color:#d0d5dd;border-radius:14px;padding:10px;cursor:pointer}
-.ix-note{color:var(--muted);font-size:12px;margin:0}
-.ix-sum .ix-note{color:#98a2b3}
+.doc{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);margin-bottom:18px}
+.doc-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:#fbfcfe;border-radius:14px 14px 0 0}
+.doc-title b{font-size:16px}
+.doc-title span{margin-inline-start:10px;color:var(--muted);font-size:12px}
+.doc-actions{display:flex;gap:8px;flex-wrap:wrap}
+.doc-btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:13px}
+.doc-btn:hover{border-color:#cbd5e1;background:#f8fafc}
+.doc-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.doc-btn.primary:hover{background:var(--blue2)}
+.doc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:16px;border-bottom:1px solid var(--line)}
+.df{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:700;min-width:0}
+.df input,.df select,.doc-tbl input,.tl input{width:100%;height:36px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;color:var(--ink);font-size:14px}
+.df input:focus,.df select:focus,.doc-tbl input:focus,.tl input:focus,.doc-search input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.df>b,.df>span+b{display:flex;align-items:center;height:36px;padding:0 10px;border-radius:8px;background:#f8fafc;border:1px solid var(--line);color:var(--ink);font-size:14px}
+.df .note{height:auto;padding:8px 10px;font-weight:600;font-size:12px;line-height:1.5;color:var(--muted)}
+.df.wide{grid-column:1/-1}
+.doc-add{padding:14px 16px;border-bottom:1px solid var(--line)}
+.doc-search{position:relative}
+.doc-search input{width:100%;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;background:#fff;color:var(--ink)}
+.doc-res{position:absolute;top:100%;left:0;right:0;margin-top:4px;z-index:5;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);display:grid;max-height:320px;overflow:auto}
+.doc-res:empty{display:none}
+.doc-res-item{display:flex;flex-direction:column;align-items:flex-start;text-align:right;border:0;border-bottom:1px solid #f0f2f5;background:#fff;padding:10px 14px;cursor:pointer;color:var(--ink);width:100%}
+.doc-res-item:last-child{border-bottom:0}
+.doc-res-item:hover,.doc-res-item:focus{background:#eff6ff;outline:none}
+.doc-res-item small{color:var(--muted);font-size:12px}
+.doc-res-empty{padding:12px 14px;color:var(--muted);font-size:13px}
+.doc-grid-wrap{overflow-x:auto}
+.doc-tbl{width:100%;border-collapse:collapse;min-width:720px}
+.doc-tbl th{background:#f3f6fa;color:#475467;font-size:12px;font-weight:700;padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.doc-tbl td{padding:6px 10px;border-bottom:1px solid #eef1f5;vertical-align:middle}
+.doc-tbl td b{display:block;font-weight:600}
+.doc-tbl td small{color:var(--muted);font-size:11px}
+.doc-tbl .c-n{width:44px;text-align:center;color:var(--muted);background:#fbfcfe}
+.doc-tbl .c-q{width:110px}
+.doc-tbl .c-p{width:130px}
+.doc-tbl .c-d{width:120px}
+.doc-tbl .c-t{width:130px;text-align:left;font-weight:800}
+.doc-tbl .c-x{width:44px;text-align:center}
+.doc-tbl th.c-n{text-align:center}
+.doc-empty td{text-align:center;color:var(--muted);padding:28px 10px}
+.doc-del{width:28px;height:28px;border-radius:8px;border:1px solid #fecaca;background:#fff;color:var(--red);cursor:pointer;font-size:16px;line-height:1}
+.doc-foot{display:flex;flex-direction:column;gap:10px;padding:14px 16px;background:#fbfcfe;border-top:1px solid var(--line);border-radius:0 0 14px 14px}
+.doc-count{color:var(--muted);font-size:12px;font-weight:700}
+.doc-totals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.tl{display:flex;flex-direction:column;gap:4px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.tl span{font-size:12px;color:var(--muted);font-weight:700}
+.tl b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl.big{background:var(--blue);border-color:var(--blue)}
+.tl.big span,.tl.big b{color:#fff}
+@media(max-width:760px){
+  .doc-tbl{min-width:0}
+  .doc-tbl thead{display:none}
+  .doc-tbl tr{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border-bottom:1px solid var(--line)}
+  .doc-tbl tr.doc-empty{display:table-row}
+  .doc-tbl td{border:0;padding:0;display:flex;flex-direction:column;gap:4px;width:auto !important;text-align:right}
+  .doc-tbl td::before{content:attr(data-label);font-size:11px;color:var(--muted);font-weight:700}
+  .doc-tbl td.c-n{display:none}
+  .doc-tbl td:nth-child(2){grid-column:1/-1}
+  .doc-tbl td.c-x{grid-column:1/-1;flex-direction:row;justify-content:flex-end}
+  .doc-tbl td.c-x::before{content:none}
+  .doc-tbl td.c-t{text-align:right}
+  .doc-totals{grid-template-columns:1fr 1fr}
+  .doc-head{grid-template-columns:1fr 1fr}
+}
 .doc-bar{display:flex;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e4e7ec;border-radius:10px;padding:8px;margin-bottom:12px;position:sticky;top:0;z-index:2}
 .doc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
 .doc-f{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#667085;font-weight:700}
