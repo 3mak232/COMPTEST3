@@ -135,6 +135,16 @@ html,body{overflow-x:hidden}.login-page{min-height:100dvh;width:100%;display:gri
 @media (prefers-reduced-motion:reduce){.pg-in,.btn,.card,.sidebtn{animation:none!important;transition:none!important}}
 .page-loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:70px 0}.pl-spin{width:34px;height:34px;border:3px solid #e5e9f0;border-top-color:var(--blue,#2563eb);border-radius:50%;animation:spin .75s linear infinite}
 .app-version{margin-top:28px;text-align:center;color:#98a2b3;font-size:12px}
+.org-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.org-stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.org-stat span{color:#667085;font-size:13px}.org-stat b{font-size:28px;color:#101828}.org-stat small{color:#98a2b3}
+.org-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px}
+.org-fields{display:grid;gap:10px;margin:12px 0}
+.org-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid #f0f2f5}
+.org-item:last-child{border-bottom:0}
+.org-code{min-width:54px;height:36px;border-radius:10px;background:#eef4ff;color:#1d4ed8;display:grid;place-items:center;font-weight:800;font-size:13px;padding:0 8px}
+.org-main{flex:1;display:flex;flex-direction:column}
+.org-list{max-height:520px;overflow:auto}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"></head>
 <body><div id="app"></div><div id="globalLoader" aria-live="polite"><div class="loader-card"><div class="loader-ring"></div><b id="loaderTitle">جاري التحميل...</b><div class="muted" id="loaderText">من فضلك انتظر</div></div></div><div id="toast" class="toast"></div>
@@ -531,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.27';
+const APP_VERSION='v1.28';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -567,5 +577,33 @@ cacheAppShell();
 withLoading(()=>boot(),'جاري تشغيل النظام...','جارٍ التحقق من جلسة الدخول وتحميل الإعدادات');
 document.querySelector('#globalLoader')?.classList.add('show');
 sb.auth.getSession().then(boot).catch(err=>{const b=document.querySelector('#globalLoader');b?.classList.remove('show');alert(err?.message||err)});
+
+// --- v1.28: صفحة الفروع ومراكز التكلفة (تعريف لاحق يحل محل القديم) ---
+async function orgView(){
+  const [B,CC]=await Promise.all([g('branches','name'),g('cost_centers','code')]);
+  const activeB=B.filter(x=>x.active).length, activeC=CC.filter(x=>x.active).length;
+  const items=(rows,kind)=>rows.length?rows.map(x=>`<div class="org-item"><div class="org-code">${e(x.code||'—')}</div><div class="org-main"><b>${e(x.name)}</b><small class="muted">${kind}</small></div><span class="chip ${x.active?'success':'warning'}">${x.active?'نشط':'موقوف'}</span></div>`).join(''):'<p class="muted">لا توجد بيانات بعد.</p>';
+  return `${sectionHead('الفروع ومراكز التكلفة','الأبعاد التنظيمية اللي بتربط الحركات والتقارير.')}
+  <div class="org-stats">
+    <div class="org-stat"><span>الفروع النشطة</span><b>${activeB}</b><small>من ${B.length}</small></div>
+    <div class="org-stat"><span>مراكز التكلفة النشطة</span><b>${activeC}</b><small>من ${CC.length}</small></div>
+  </div>
+  <div class="org-grid">
+    <div class="card org-form">
+      <div class="card-title"><b>فرع جديد</b><span class="muted">يظهر في الفواتير والتقارير</span></div>
+      <div class="org-fields"><input id="obn" placeholder="اسم الفرع"><input id="obc" placeholder="كود الفرع"></div>
+      <button class="btn" onclick="act(()=>ins('branches',{name:v('obn'),code:v('obc')}))">إضافة فرع</button>
+    </div>
+    <div class="card org-form">
+      <div class="card-title"><b>مركز تكلفة جديد</b><span class="muted">لتتبع المصروفات حسب النشاط</span></div>
+      <div class="org-fields"><input id="occ" placeholder="كود المركز"><input id="ocn" placeholder="اسم المركز"></div>
+      <button class="btn soft" onclick="act(()=>ins('cost_centers',{code:v('occ'),name:v('ocn')}))">إضافة مركز تكلفة</button>
+    </div>
+  </div>
+  <div class="org-grid">
+    <div class="card"><div class="card-title"><b>الفروع</b><span class="chip info">${B.length}</span></div><div class="org-list">${items(B,'فرع')}</div></div>
+    <div class="card"><div class="card-title"><b>مراكز التكلفة</b><span class="chip info">${CC.length}</span></div><div class="org-list">${items(CC,'مركز تكلفة')}</div></div>
+  </div>`;
+}
 </script>
 </body></html>
