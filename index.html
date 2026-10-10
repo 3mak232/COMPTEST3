@@ -317,6 +317,26 @@ html,body{overflow-x:hidden}.login-page{min-height:100dvh;width:100%;display:gri
 .tile b{font-size:18px}
 .tile input{margin:0}
 .btn.sm{padding:6px 12px;font-size:12px}
+
+/* --- v1.36: قائمة المبيعات والمشتريات --- */
+.ix-bar{display:flex;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.ix-bar span{font-weight:800;color:#0f172a;font-size:15px}
+.ix-back{border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 14px;font-weight:700;color:#334155;cursor:pointer;font-size:13px}
+.ix-back:hover{background:#f8fafc}
+.ix-hub{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:6px 0 20px}
+.ix-tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:right;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.04),0 10px 26px rgba(16,24,40,.06);transition:transform .15s,box-shadow .15s,border-color .15s;font:inherit;color:#0f172a}
+.ix-tile:hover{transform:translateY(-2px);border-color:#bfdbfe;box-shadow:0 2px 4px rgba(16,24,40,.05),0 16px 34px rgba(37,99,235,.12)}
+.ix-tile b{font-size:17px;font-weight:800}
+.ix-tile small{color:#64748b;font-size:12.5px;line-height:1.6;font-weight:500}
+.ix-ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:#eef2ff;color:#4338ca;font-size:20px;font-weight:800}
+.ix-tile.new{background:linear-gradient(135deg,#2563eb,#4f46e5);border-color:transparent;color:#fff}
+.ix-tile.new small{color:rgba(255,255,255,.85)}
+.ix-tile.new .ix-ico{background:rgba(255,255,255,.18);color:#fff}
+.ix-list{padding:18px}
+.ix-list-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ix-list-head small{display:block;color:#64748b;font-weight:600}
+.ix-list-head .inv-search{max-width:360px;width:100%;height:44px;border-radius:999px;border:1px solid transparent;background:#f1f5f9;padding:0 16px;font-size:14px}
+.ix-list-head .inv-search:focus{outline:none;background:#fff;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.14)}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"></head>
 <body><div id="app"></div><div id="globalLoader" aria-live="polite"><div class="loader-card"><div class="loader-ring"></div><b id="loaderTitle">جاري التحميل...</b><div class="muted" id="loaderText">من فضلك انتظر</div></div></div><div id="toast" class="toast"></div>
@@ -351,7 +371,7 @@ function withLoading(fn,title='جاري المعالجة...',text='يتم حفظ
 function goBack(){const p=(window._nav||[]).pop();if(!p)return;view=p;localStorage.setItem('erp_v_view',p);closeMobileNav?.();showPlaceholder();return R('soft')}
 function toast(msg){const t=$('#toast');if(!t)return;t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 function showPlaceholder(){const pg=document.querySelector('.page');if(pg)pg.innerHTML='<div class="page-loading"><div class="pl-spin"></div><p class="muted">جاري فتح الصفحة...</p></div>'}
-function go(vw){if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();showPlaceholder();return R('soft')}
+function go(vw){window.ixMode={};if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();showPlaceholder();return R('soft')}
 
 const P={admin:'*',accountant:['dash','prod','cust','supp','sales','purch','po','grn','dn','pay','exp','cash','trf','ret','quo','ord','stmt','emp','prl','asset','bank','price','rep','jr','stk','period','appr','chk','comm','taxdoc','org','health','audit'],sales:['dash','prod','cust','sales','dn','ret','quo','ord','stmt','price','comm','taxdoc','appr'],store:['dash','prod','purch','po','grn','dn','ret','trf','stk','mfg']};
 const canBase=x=>me&&(P[me.role]==='*'||P[me.role].includes(x));
@@ -713,7 +733,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.35';
+const APP_VERSION='v1.36';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -887,7 +907,7 @@ function invSet(k,i,f,val){
 }
 function invDel(k,i){cart[k].splice(i,1);invRedraw(k)}
 function invNew(k){cart[k]=[];R('soft')}
-async function invoiceView(s){
+async function invoiceFormView(s){
   const k=s?'s':'p', cr=cart[k]||[];
   const who=s?C.customers:C.suppliers;
   const L=await g(s?'sales_invoice_balances':'purchase_invoice_balances','date');
@@ -944,10 +964,43 @@ async function invoiceView(s){
       </div>
     </div>
   </div>
-  <div class="card">
-    <div class="card-title"><b>الفواتير السابقة</b><input class="inv-search" placeholder="بحث بالرقم أو الاسم" oninput="invFilter(this.value)"></div>
-    <div class="table-wrap"><table class="inv-table"><thead><tr><th>الرقم</th><th>التاريخ</th><th>${s?'العميل':'المورد'}</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="8" class="muted">لا توجد فواتير بعد.</td></tr>'}</tbody></table></div>
+`;
+}
+
+// --- v1.36: قائمة المبيعات/المشتريات: إنشاء فاتورة / الفواتير السابقة / المستحقة ---
+window.ixMode=window.ixMode||{};
+function ixSetMode(k,m){window.ixMode=window.ixMode||{};window.ixMode[k]=m;R('soft')}
+function ixBar(k,label,title){return `<div class="ix-bar"><button type="button" class="ix-back" onclick="ixSetMode('${k}','hub')">→ ${title}</button><span>${label}</span></div>`}
+function ixHub(k,s,L){
+  const due=L.filter(x=>Number(x.outstanding)>0);
+  const dueSum=due.reduce((a,x)=>a+Number(x.outstanding||0),0);
+  const tile=(cls,mode,ico,t,sub)=>`<button type="button" class="ix-tile ${cls}" onclick="ixSetMode('${k}','${mode}')"><span class="ix-ico">${ico}</span><b>${t}</b><small>${sub}</small></button>`;
+  return `<div class="ix-hub">
+    ${tile('new','new','+','إنشاء فاتورة جديدة',s?'فاتورة بيع بأصناف ودفع':'فاتورة شراء بأصناف ودفع')}
+    ${tile('','list','≡','الفواتير السابقة',`${L.length} فاتورة · ابحث بالرقم أو الاسم أو التاريخ`)}
+    ${tile('','due','!','الفواتير المستحقة',`${due.length} فاتورة · متبقي ${fmt(dueSum)}`)}
   </div>`;
+}
+function ixListCard(k,s,L,mode){
+  const who=getWho(k);
+  const list=L.slice().reverse().filter(x=>mode==='list'||Number(x.outstanding)>0);
+  const rows=list.map(x=>{
+    const party=(by(who,s?x.customer_id:x.supplier_id).name)||'—';
+    const [st,cls]=invStatus(x);
+    return `<tr data-s="${e((x.number+' '+party+' '+(x.date||'')).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(party)}</td><td>${fmt(x.total)}</td><td>${fmt(x.allocated_paid)}</td><td>${fmt(x.outstanding)}</td><td><span class="chip ${cls}">${st}</span></td><td><button class="btn soft sm" onclick="printInvoice('${x.id}',${s})">طباعة</button></td></tr>`;
+  }).join('');
+  return `<div class="card ix-list">
+    <div class="ix-list-head"><div><b>${mode==='list'?'كل الفواتير':'الفواتير المستحقة'}</b><small>${list.length} فاتورة</small></div>
+      <input class="inv-search" type="search" placeholder="ابحث بالرقم أو الاسم أو التاريخ" oninput="invFilter(this.value)"></div>
+    <div class="table-wrap"><table class="inv-table"><thead><tr><th>الرقم</th><th>التاريخ</th><th>${s?'العميل':'المورد'}</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="8" class="muted">لا توجد نتائج</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+async function invoiceView(s){
+  const k=s?'s':'p', mode=(window.ixMode||{})[k]||'hub', title=s?'المبيعات':'المشتريات';
+  if(mode==='new') return ixBar(k,'إنشاء فاتورة جديدة',title)+await invoiceFormView(s);
+  const L=await g(s?'sales_invoice_balances':'purchase_invoice_balances','date');
+  if(mode==='list'||mode==='due') return ixBar(k,mode==='list'?'الفواتير السابقة':'الفواتير المستحقة',title)+ixListCard(k,s,L,mode);
+  return sectionHead(title,'اختار: فاتورة جديدة، أو الفواتير السابقة، أو المستحقات.')+ixHub(k,s,L);
 }
 async function printInvoice(id,s){
   const w=window.open('','_blank');
