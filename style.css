@@ -392,3 +392,10 @@ body{background:#f4f6fa}
 .stmt-pick{display:flex;flex-direction:column;gap:6px;flex:1;min-width:260px;position:relative}
 .stmt-res{max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
 .stmt-res:empty{display:none}
+
+/* ===== v1.43: سجل العمليات باليوم + تفاصيل التحويل ===== */
+.day-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px}
+.day-btn{display:flex;flex-direction:column;align-items:flex-start;min-width:150px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#0f172a;cursor:pointer;text-align:right}
+.day-btn small{color:#64748b;margin-top:4px}
+.day-btn.on{border-color:#4f46e5;background:#eef2ff}
+.tr-detail{border-inline-start:4px solid #4f46e5}
