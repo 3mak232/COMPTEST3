@@ -387,3 +387,8 @@ body{background:#f4f6fa}
 .tr-card textarea{width:100%}
 .tr-actions{display:flex;justify-content:flex-end;margin-top:14px}
 @media(max-width:760px){.tr-route{grid-template-columns:1fr}.tr-arrow{height:auto;transform:rotate(90deg);padding:0}.tr-add{grid-template-columns:1fr 1fr}.tr-add .grow{grid-column:1/-1}}
+
+/* ===== v1.40: بحث الطرف في كشف الحساب ===== */
+.stmt-pick{display:flex;flex-direction:column;gap:6px;flex:1;min-width:260px;position:relative}
+.stmt-res{max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+.stmt-res:empty{display:none}
