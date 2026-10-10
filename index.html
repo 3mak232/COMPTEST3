@@ -487,7 +487,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.45';
+const APP_VERSION='v1.46';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -908,8 +908,8 @@ function showModal(html,footer){
 function closeModal(){const m=document.getElementById('modalBg');if(m)m.remove();window._trDet=null;window._fmSave=null}
 // نافذة نموذج: تعديل/إضافة. الحفظ يمر بـ act (يعرض الخطأ ويعيد الرسم) ثم يقفل النافذة عند النجاح
 function formModal(title,fields,save,label){
-  window._fmSave=save;
   showModal(`<div class="card-title"><b>${title}</b></div><div class="fm-grid">${fields}</div>`,`<button class="btn" onclick="fmSave()">${label||'حفظ'}</button>`);
+  window._fmSave=save;
 }
 function fmSave(){const f=window._fmSave;if(!f)return;act(async()=>{await f();closeModal()})}
 async function fnCall(body){
@@ -1368,6 +1368,132 @@ async function legacyHtml(){
   if(view==='emp')return await employeesView(); if(view==='prl')return await payrollView(); if(view==='users')return await usersView(); if(view==='audit')return await auditView(); if(view==='set')return await settingsView();
   return '';
 }
+
+
+/* =====================================================================
+   v1.46 — تعريفات لاحقة (الأخيرة تسري)
+   ===================================================================== */
+
+// ---------- الأصناف: القائمة لوحدها + إضافة وتعديل في نافذة ----------
+function prodNew(){
+  formModal('إضافة صنف جديد',
+    `<label class="fm-f"><span>الاسم *</span><input id="pn" placeholder="اسم الصنف"></label><label class="fm-f"><span>الكود</span><input id="pc"></label><label class="fm-f"><span>الباركود</span><input id="pbc"></label><label class="fm-f"><span>سعر الشراء</span><input id="pp" type="number"></label><label class="fm-f"><span>سعر البيع</span><input id="ps" type="number"></label><label class="fm-f"><span>سعر الجملة</span><input id="pw" type="number"></label><label class="fm-f"><span>حد إعادة الطلب</span><input id="pm" type="number"></label><label class="fm-f"><span>كمية إعادة الطلب</span><input id="prq" type="number"></label><label class="fm-f"><span>الرصيد الافتتاحي (اختياري)</span><input id="pq" type="number"></label><label class="fm-f"><span>المخزن (للرصيد الافتتاحي)</span><select id="pwh">${O(C.warehouses)}</select></label>`,
+    async()=>{
+      const nm=v('pn').trim();
+      if(!nm)throw Error('اكتب اسم الصنف');
+      if(dupProdName(nm))throw Error('يوجد صنف بنفس الاسم بالفعل — عدّل الصنف الموجود بدل إضافة نسخة جديدة');
+      const p=await ins('products',{name:nm,code:v('pc')||null,barcode:v('pbc')||null,purchase_price:n('pp'),sale_price:n('ps'),wholesale_price:n('pw'),min_stock:n('pm'),reorder_qty:n('prq'),avg_cost:n('pp')});
+      if(n('pq')>0)await rpc('set_opening_stock',{p_prod:p.id,p_wh:v('pwh'),p_qty:n('pq')});
+    },'إضافة الصنف');
+}
+function productsView(){
+  const canM=canMaster();
+  const rows=C.products.filter(p=>!window._q||[p.name,p.code,p.barcode].join(' ').includes(window._q)).map(p=>[e(p.code),e(p.name),e(p.barcode),fmt(p.avg_cost),fmt(p.sale_price),`<span class="${stkQty(p.id)<=p.min_stock?'bad':''}">${stkQty(p.id)}</span>`,p.active?'مفعّل':'معطل',canM?`<div class="row-btns"><button class="s" onclick="prodEdit('${p.id}')">تعديل</button><button class="s" onclick="act(()=>upd('products','${p.id}',{active:${!p.active}}))">${p.active?'تعطيل':'تفعيل'}</button></div>`:'']);
+  return sectionHead('الأصناف','القائمة لوحدها. الإضافة والتعديل من النافذة.')+
+    (canM?`<div class="card np"><div class="row"><button onclick="prodNew()">+ إضافة صنف</button></div></div>`:`<div class="card np muted">عرض فقط — إضافة الأصناف وتعديلها متاحة للإدارة والمحاسب والمخزن.</div>`)+
+    `<div class="card"><input id="q" placeholder="بحث بالاسم أو الكود أو الباركود" value="${e(window._q||'')}" oninput="qSearch(this)">${T(['الكود','الاسم','الباركود','التكلفة','بيع','المخزون','الحالة',''],rows)}</div>`;
+}
+
+// ---------- المرتجعات: نفس شكل المبيعات (إنشاء / السابقة) + طباعة ----------
+window.ixMode=window.ixMode||{};
+function retRecalc(){
+  if(!RT)return;
+  let t=0;
+  RT.items.forEach((x,i)=>{
+    const q=Math.min(Math.max(n('rq'+i),0),Number(x.qty)||0);
+    const l=q*Number(x.unit_price||0);t+=l;
+    const c=document.getElementById('rt'+i);if(c)c.textContent=fmt(l);
+  });
+  const el=document.getElementById('retTot');if(el)el.textContent=fmt(t);
+}
+async function retSave(){
+  const cur=RT;if(!cur)return;
+  const items=cur.items.map((x,i)=>({product_id:x.product_id,qty:n('rq'+i)})).filter(x=>x.qty>0);
+  if(!items.length)return alert('اكتب كمية مرتجع لصنف واحد على الأقل');
+  const tbl=cur.s?'sales_returns':'purchase_returns';
+  const beforeRes=await sb.from(tbl).select('id').eq('invoice_id',cur.id);
+  const before=new Set((beforeRes.data||[]).map(x=>x.id));
+  await act(async()=>{await rpc(cur.s?'create_sales_return':'create_purchase_return',{p_invoice:cur.id,p_items:items});RT=null});
+  window.ixMode.r='list';
+  const afterRes=await sb.from(tbl).select('id').eq('invoice_id',cur.id);
+  const fresh=(afterRes.data||[]).find(x=>!before.has(x.id));
+  if(fresh&&confirm('تم حفظ المرتجع. تطبعه الآن؟'))retPrint(fresh.id,cur.s);
+  R('soft');
+}
+async function retView(){
+  const mode=window.ixMode.r||'hub';
+  const sel=window._rk!=='p', title=sel?'مرتجع مبيعات':'مرتجع مشتريات';
+  const[SI,PI,RS]=await Promise.all([g('sales_invoices','date'),g('purchase_invoices','date'),g(sel?'sales_returns':'purchase_returns','date')]);
+  const L=sel?SI:PI, who=sel?C.customers:C.suppliers;
+  const kindSel=`<select id="rk" onchange="window._rk=v('rk');RT=null;R('soft')"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select>`;
+  if(mode==='list'){
+    const rows=RS.slice().reverse().map(x=>{const pn=(by(who,sel?x.customer_id:x.supplier_id).name)||'—';const inv=(by(L,x.invoice_id).number)||'—';return `<tr data-s="${e((x.number+' '+inv+' '+pn+' '+(x.date||'')).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(inv)}</td><td>${e(pn)}</td><td>${fmt(x.total)}</td><td><button class="btn soft sm" onclick="retPrint('${x.id}',${sel})">طباعة</button></td></tr>`}).join('');
+    return ixBar('r','المرتجعات السابقة',title)+`<div class="card ix-list"><div class="ix-list-head"><div><b>كل المرتجعات</b><small>${RS.length} مرتجع</small></div><input class="inv-search" type="search" placeholder="ابحث بالرقم أو الاسم أو التاريخ" oninput="invFilter(this.value)"></div><div class="table-wrap"><table class="inv-table"><thead><tr><th>الرقم</th><th>التاريخ</th><th>الفاتورة</th><th>${sel?'العميل':'المورد'}</th><th>الإجمالي</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد مرتجعات بعد</td></tr>'}</tbody></table></div></div>`;
+  }
+  if(mode==='new'){
+    const cur=(RT&&RT.s===sel)?RT:null;
+    const invOpts=L.slice().reverse().map(x=>`<option value="${x.id}" ${cur&&cur.id===x.id?'selected':''}>${e(x.number)} — ${fmt(x.total)}</option>`).join('');
+    const rowsHtml=cur?cur.items.map((x,i)=>`<tr><td class="c-n">${i+1}</td><td><b>${e((by(C.products,x.product_id).name)||'—')}</b></td><td class="c-q">${fmt(x.qty)}</td><td class="c-p">${fmt(x.unit_price)}</td><td class="c-q"><input id="rq${i}" type="number" step="0.001" min="0" value="0" oninput="retRecalc()" style="width:110px"></td><td class="c-t" id="rt${i}">0</td></tr>`).join(''):'<tr><td colspan="6" class="muted">اختار الفاتورة واضغط "عرض البنود".</td></tr>';
+    return ixBar('r','إنشاء مرتجع جديد',title)+`<div class="doc">
+      <div class="doc-toolbar"><div class="doc-title"><b>${title}</b><span>اكتب الكمية المرتجعة لكل صنف، ثم احفظ</span></div>
+        <div class="doc-actions"><button type="button" class="doc-btn primary" onclick="retSave()" ${cur?'':'disabled'}>حفظ المرتجع</button><button type="button" class="doc-btn" onclick="RT=null;R('soft')">تفريغ</button></div></div>
+      <div class="doc-head"><div class="df"><span>النوع</span>${kindSel}</div><label class="df wide">الفاتورة<select id="ri">${invOpts}</select></label><div class="df"><span>&nbsp;</span><button type="button" class="doc-btn" onclick="loadRet()">عرض البنود</button></div></div>
+      <div class="doc-grid-wrap"><table class="doc-tbl"><thead><tr><th class="c-n">#</th><th>الصنف</th><th class="c-q">الكمية بالفاتورة</th><th class="c-p">السعر</th><th class="c-q">كمية المرتجع</th><th class="c-t">التقدير</th></tr></thead><tbody id="retRows">${rowsHtml}</tbody></table></div>
+      <div class="doc-foot"><span class="doc-count">${cur?cur.items.length+' بند':''}</span><div class="doc-totals"><div class="tl big"><span>تقدير قيمة المرتجع</span><b id="retTot">0</b></div></div></div>
+      <p class="muted">التقدير بيحسب بالسعر قبل الضريبة والخصم. القيمة النهائية بتتحسب على السيرفر عند الحفظ.</p></div>`;
+  }
+  // الرئيسية للمرتجعات
+  const tile=(cls,m,ico,t,sub)=>`<button type="button" class="ix-tile ${cls}" onclick="ixSetMode('r','${m}')"><span class="ix-ico">${ico}</span><b>${t}</b><small>${sub}</small></button>`;
+  return sectionHead('المرتجعات','إنشاء مرتجع لفاتورة مبيعات أو مشتريات، ومتابعة المرتجعات السابقة وطباعتها.')+
+    `<div class="card np">${kindSel}</div><div class="ix-hub">${tile('new','new','+','إنشاء مرتجع جديد',sel?'مرتجع من فاتورة بيع':'مرتجع من فاتورة شراء')}${tile('','list','≡','المرتجعات السابقة',`${RS.length} مرتجع · اطبع أي مرتجع`)}</div>`;
+}
+
+// ---------- العمولات: اسم البائع وقاعدة العمولة واضحين ----------
+async function commissionView(){
+  const sec=secCur('comm','rules');
+  const[RL,I,Cm,PN]=await Promise.all([g('commission_rules','name'),g('sales_invoices','date'),g('sales_commissions','created_at'),profNames()]);
+  const bar=secBar('comm',[['rules','قواعد العمولة'],['calc','حساب عمولة'],['list','العمولات المسجلة']],'rules');
+  let body='';
+  if(sec==='rules') body=`<div class="card form-card"><div class="card-title"><b>قاعدة عمولة جديدة</b></div><div class="row"><input id="crn" placeholder="اسم القاعدة"><input id="crr" type="number" step="0.0001" placeholder="النسبة %"><select id="crb"><option value="net_sales">صافي المبيعات</option><option value="gross_profit">مجمل الربح</option></select><button class="btn" onclick="act(()=>rpc('create_commission_rule',{p_name:v('crn'),p_rate:n('crr'),p_basis:v('crb')}))">إضافة القاعدة</button></div></div><div class="card">${T(['القاعدة','النسبة %','الأساس'],RL.map(x=>[e(x.name),x.rate,x.basis==='gross_profit'?'مجمل الربح':'صافي المبيعات']))}</div>`;
+  else if(sec==='calc') body=`<div class="card form-card"><div class="card-title"><b>حساب عمولة فاتورة</b><span class="muted">العمولة بتتسجل باسم بائع الفاتورة (المستخدم اللي أنشأها).</span></div><div class="row"><select id="cri">${I.filter(x=>x.status==='Posted').map(x=>`<option value="${x.id}">${e(x.number)} — البائع: ${e(PN[x.salesperson]||'غير محدد')} — ${fmt(x.total)}</option>`).join('')}</select><select id="crr2">${O(RL)}</select><button class="btn" onclick="act(()=>rpc('calculate_sales_commission',{p_invoice:v('cri'),p_rule:v('crr2')}))">حساب وتسجيل العمولة</button></div></div>`;
+  else body=`<div class="card"><p class="muted">كل سطر: الفاتورة، وبائعها اللي العمولة ليه، والقاعدة المستخدمة، والمبلغ. لو ظهر "غير محدد" يبقى الفاتورة من غير بائع.</p>${T(['الفاتورة','البائع (صاحب العمولة)','القاعدة','الأساس','العمولة','الحالة'],Cm.map(x=>{const inv=by(I,x.invoice_id);return [e(inv.number||'—'),e(PN[x.salesperson_id]||'غير محدد'),e((by(RL,x.rule_id).name)||'—'),fmt(x.basis_amount),fmt(x.amount),chip(x.status||'مسجلة',x.status==='Paid'?'success':'warning')]}))}</div>`;
+  return sectionHead('العمولات','عمولات البائعين: القواعد، الحساب، والسجل.')+bar+body;
+}
+
+// ---------- الأصول: حساب الدفع يتحول لكود الحساب المحاسبي ----------
+function glOf(id){return (by(C.accts,id).type==='bank')?'1100':'1000'}
+function assetNew(){
+  formModal('أصل ثابت جديد',
+    `<label class="fm-f"><span>اسم الأصل</span><input id="afn"></label><label class="fm-f"><span>التصنيف</span><select id="afc">${O(window._assetCats||[])}</select></label><label class="fm-f"><span>التكلفة</span><input id="afcost" type="number"></label><label class="fm-f"><span>القيمة المتبقية</span><input id="afres" type="number" value="0"></label><label class="fm-f"><span>العمر بالشهور</span><input id="aflife" type="number" value="60"></label><label class="fm-f"><span>دفعنا منين (الخزينة أو البنك)</span><select id="afacct">${O(C.accts)}</select></label>`,
+    async()=>{
+      if(!v('afc'))throw Error('أضف تصنيف أصل الأول من تبويب التصنيفات');
+      const id=await rpc('create_fixed_asset',{p_name:v('afn'),p_category:v('afc'),p_cost:n('afcost'),p_residual:n('afres'),p_life_months:n('aflife'),p_purchase_date:new Date().toISOString().slice(0,10),p_branch:null});
+      await rpc('capitalize_fixed_asset',{p_asset:id,p_credit_account:glOf(v('afacct'))});
+    },'إضافة وتسجيل');
+}
+
+// ---------- المصروفات: خانة تفاصيل + طباعة اليوم ----------
+async function expensesView(){
+  const L=await g('expenses','date');
+  const day=dyGet('exp');
+  const sumOf=d=>L.filter(x=>x.date===d).reduce((a,x)=>a+Number(x.amount||0),0);
+  const rowsDay=L.filter(x=>x.date===day).reverse();
+  const tot=rowsDay.reduce((a,x)=>a+Number(x.amount||0),0);
+  const acctName=id=>(by(C.accts,id).name)||'—';
+  const cells=rowsDay.map(x=>[e(x.category||''),e(x.description||'—'),e(x.notes||'—'),money(x.amount),e(acctName(x.account_id))]);
+  const dl=new Date(day+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Cairo'});
+  ptStore('exp','مصروفات '+dl,'',['التصنيف','الوصف','التفاصيل','المبلغ','الحساب'],rowsDay.map(x=>[e(x.category||''),e(x.description||'—'),e(x.notes||'—'),fmt(x.amount),e(acctName(x.account_id))]),`<p class="tot">الإجمالي: ${fmt(tot)}</p>`);
+  return sectionHead('المصروفات','المصروف بيتسجل بتاريخ اليوم. الأيام السابقة للعرض والطباعة.')+
+    `<div class="card form-card"><div class="card-title"><b>تسجيل مصروف (اليوم)</b></div>
+      <div class="row"><select id="ec"><option>إيجار</option><option>كهرباء</option><option>مياه</option><option>إنترنت</option><option>رواتب</option><option>نقل</option><option>صيانة</option><option>تسويق</option><option>أخرى</option></select><input id="ed" placeholder="الوصف (مثال: فاتورة كهرباء)"><input id="ea" type="number" placeholder="المبلغ"><select id="ex">${O(C.accts)}</select></div>
+      <textarea id="en" rows="2" placeholder="تفاصيل إضافية (اختياري): مين اتدفعله، رقم الفاتورة، ملاحظات" style="width:100%;margin-top:10px"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="act(()=>rpc('create_expense',{p_category:v('ec'),p_desc:v('ed')||null,p_amount:n('ea'),p_account:v('ex'),p_notes:v('en')||null}))">حفظ المصروف</button></div></div>`+
+    dayStrip('exp',day,d=>fmt(sumOf(d)))+
+    `<div class="card"><div class="card-title"><b>مصروفات ${e(dl)}</b><div class="row"><span class="chip info">الإجمالي ${fmt(tot)}</span><button class="btn" onclick="ptPrint('exp')">🖨 طباعة مصروفات هذا اليوم</button></div></div>${T(['التصنيف','الوصف','التفاصيل','المبلغ','الحساب'],cells)}</div>`;
+}
+
+// ---------- الخزينة: أسماء المصادر (بما فيها الحركات القديمة المرحّلة) ----------
+Object.assign(LEDGER_SRC,{record_initial_payment:'دفعة مع فاتورة',backfill_payment:'دفعة (قبل التحديث)',backfill_expense:'مصروف (قبل التحديث)',backfill_transfer:'تحويل (قبل التحديث)',backfill_payroll:'مرتب (قبل التحديث)'});
 
 </script>
 </body></html>
