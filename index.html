@@ -337,6 +337,43 @@ html,body{overflow-x:hidden}.login-page{min-height:100dvh;width:100%;display:gri
 .ix-list-head small{display:block;color:#64748b;font-weight:600}
 .ix-list-head .inv-search{max-width:360px;width:100%;height:44px;border-radius:999px;border:1px solid transparent;background:#f1f5f9;padding:0 16px;font-size:14px}
 .ix-list-head .inv-search:focus{outline:none;background:#fff;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.14)}
+/* --- v1.37: الثيم العام للموقع (نفس روح شاشة الفاتورة) --- */
+body{background:#f4f6fa}
+.page h2,.section-head h2{font-size:22px;font-weight:800;letter-spacing:-.2px;color:#0f172a}
+.section-head p{color:#64748b;font-size:13px}
+.card{border-color:#e8edf3;border-radius:18px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 10px 26px rgba(16,24,40,.05);margin-bottom:16px}
+.card-title b{font-size:15px;color:#0f172a}
+.np{padding:18px}
+.btn{background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;border-radius:12px;padding:10px 16px;font-weight:700;box-shadow:0 6px 16px rgba(37,99,235,.22);transition:filter .15s,box-shadow .15s}
+.btn:hover{background:linear-gradient(135deg,#2563eb,#4f46e5);filter:brightness(1.06);box-shadow:0 8px 20px rgba(37,99,235,.3)}
+.btn.soft{background:#eef2ff;color:#3730a3;box-shadow:none}
+.btn.soft:hover{background:#e0e7ff}
+.btn.danger{background:#fef2f2;color:#dc2626;box-shadow:none}
+.btn.danger:hover{background:#fee2e2}
+.page input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.page select,.page textarea,.form-card input,.form-card select,.form-card textarea,.filterbar input,.filterbar select{background:#eef2f7;border:1px solid transparent;border-radius:12px;padding:0 13px;min-height:42px;height:42px;color:#0f172a;font-size:14px;font-weight:600;font-family:inherit;transition:background .15s,border-color .15s,box-shadow .15s}
+.page textarea{height:auto;padding:10px 13px;min-height:80px}
+.page select,.form-card select,.filterbar select{padding-inline-end:34px;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%232563eb' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 13px center;cursor:pointer}
+.page input:not([type=checkbox]):not([type=radio]):not([type=hidden]):hover,.page select:hover,.page textarea:hover{background-color:#e6ecf4}
+.page input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,.page select:focus,.page textarea:focus,.form-card input:focus,.form-card select:focus,.filterbar input:focus,.filterbar select:focus{outline:none;background-color:#fff;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.14)}
+.page input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+.row{gap:10px}
+.row>*{margin:0}
+.tw{border:1px solid #e8edf3;border-radius:14px;background:#fff;overflow:hidden}
+.tw table{background:#fff}
+.tw th,table th{background:#f8fafc;color:#64748b;font-size:12px;font-weight:700;padding:11px 12px;text-align:right;border-bottom:1px solid #e8edf3;white-space:nowrap}
+.tw td,table td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13.5px;color:#1e293b}
+.tw tr:last-child td,table tr:last-child td{border-bottom:0}
+.tw tr:hover td,table tr:hover td{background:#fafcff}
+.kpi{border-radius:18px;border-color:#e8edf3;padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 10px 26px rgba(16,24,40,.05)}
+.kpi strong{font-size:26px;font-weight:800;letter-spacing:-.3px}
+.chip{padding:4px 10px;font-size:11.5px}
+.empty{color:#64748b;background:#fbfcfe;border:1px dashed #d0d5dd;border-radius:14px}
+.org-item{border-radius:14px}
+.topbar{background:rgba(244,246,250,.92);border-bottom-color:#e8edf3}
+.top-search{border-radius:999px;border-color:#e2e8f0;background:#fff}
+.top-search input{font-size:14px}
+.nav-group-title{letter-spacing:.2px}
+@media(max-width:780px){.page h2{font-size:20px}.card{padding:14px;border-radius:16px}.btn{padding:11px 14px}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"></head>
 <body><div id="app"></div><div id="globalLoader" aria-live="polite"><div class="loader-card"><div class="loader-ring"></div><b id="loaderTitle">جاري التحميل...</b><div class="muted" id="loaderText">من فضلك انتظر</div></div></div><div id="toast" class="toast"></div>
@@ -733,7 +770,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.36';
+const APP_VERSION='v1.37';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
