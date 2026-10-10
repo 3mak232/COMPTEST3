@@ -541,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.29';
+const APP_VERSION='v1.30';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -615,10 +615,15 @@ function invStatus(x){
 }
 function invSum(k){
   const tot=(cart[k]||[]).reduce((a,l)=>a+l.qty*l.price-l.discount,0);
-  const net=Math.max(0,tot-n('ig'));
-  const a=document.getElementById('invSub'),b=document.getElementById('invNet');
-  if(a)a.textContent=fmt(tot);
-  if(b)b.textContent=fmt(net);
+  const disc=Number(document.getElementById('ig')?.value||0);
+  const net=Math.max(0,tot-disc);
+  const paid=Math.min(net,Math.max(0,Number(document.getElementById('ipd')?.value||0)));
+  const set=(id,t)=>{const el=document.getElementById(id);if(el)el.textContent=t};
+  set('invSub',fmt(tot));
+  set('invNet',fmt(net));
+  set('invPaid',fmt(paid));
+  set('invRem',fmt(net-paid));
+  set('docStatus',paid<=0?'آجلة':(paid>=net?'مدفوعة':'مدفوعة جزئياً'));
 }
 function invFilter(q){
   q=(q||'').trim().toLowerCase();
@@ -626,52 +631,50 @@ function invFilter(q){
 }
 async function invoiceView(s){
   const k=s?'s':'p', cr=cart[k]||[];
-  const tot=cr.reduce((a,l)=>a+l.qty*l.price-l.discount,0);
-  const [L,CO]=await Promise.all([g(s?'sales_invoice_balances':'purchase_invoice_balances','date'), g('company_settings').then(x=>x[0]||{})]);
-  const finance=me&&(me.role==='admin'||me.role==='accountant');
   const who=s?C.customers:C.suppliers;
-  const payBox=finance
-    ?`<div class="inv-pay"><label>المدفوع<input id="ipd" type="number" value="0"></label><label>الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label><label>طريقة الدفع<select id="im"><option value="credit">آجل / جزء آجل</option><option value="cash">نقدي</option><option value="bank">بنك</option><option value="wallet">محفظة</option></select></label></div>`
-    :`<div class="inv-pay"><p class="muted">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</p></div>`;
+  const L=await g(s?'sales_invoice_balances':'purchase_invoice_balances','date');
+  const finance=me&&(me.role==='admin'||me.role==='accountant');
+  const tot=cr.reduce((a,l)=>a+l.qty*l.price-l.discount,0);
+  const today=new Date().toISOString().slice(0,10);
+  const lines=cr.map((l,i)=>`<tr><td class="ln">${i+1}</td><td>${e(by(C.products,l.product_id).name)}</td><td class="num">${l.qty}</td><td class="num">${fmt(l.price)}</td><td class="num">${fmt(l.discount)}</td><td class="num">${fmt(l.qty*l.price-l.discount)}</td><td class="num"><button class="danger sm" onclick="cart.${k}.splice(${i},1);R()">حذف</button></td></tr>`);
+  for(let i=cr.length;i<6;i++)lines.push(`<tr><td class="ln">${i+1}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
+  const entry=`<tr class="entry"><td class="ln">+</td><td><select id="il">${O(C.products.filter(p=>p.active))}</select></td><td class="num"><input id="iq" type="number" value="1"></td><td class="num"><input id="ir" type="number" placeholder="تلقائي"></td><td class="num"><input id="id" type="number" value="0"></td><td class="num"></td><td class="num"><button class="btn sm" onclick="addLine('${k}')">إضافة</button></td></tr>`;
+  const payFields=finance
+    ?`<label class="doc-f">المدفوع<input id="ipd" type="number" value="0" oninput="invSum('${k}')"></label><label class="doc-f">الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label><label class="doc-f">طريقة الدفع<select id="im"><option value="credit">آجل / جزء آجل</option><option value="cash">نقدي</option><option value="bank">بنك</option><option value="wallet">محفظة</option></select></label>`
+    :`<div class="doc-box" style="grid-column:1/-1"><span>ملاحظة</span><b style="font-weight:600;font-size:13px">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</b></div>`;
   const rows=L.slice().reverse().map(x=>{
     const party=(by(who,s?x.customer_id:x.supplier_id).name)||'—';
     const [st,cls]=invStatus(x);
     return `<tr data-s="${e((x.number+' '+party).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(party)}</td><td>${fmt(x.total)}</td><td>${fmt(x.allocated_paid)}</td><td>${fmt(x.outstanding)}</td><td><span class="chip ${cls}">${st}</span></td><td><button class="btn soft sm" onclick="printInvoice('${x.id}',${s})">طباعة</button></td></tr>`;
   }).join('');
-  const paidTotal=L.reduce((a,x)=>a+Number(x.allocated_paid||0),0), outTotal=L.reduce((a,x)=>a+Number(x.outstanding||0),0), sumTotal=L.reduce((a,x)=>a+Number(x.total||0),0);
-  return `${sectionHead(s?'فواتير المبيعات':'فواتير المشتريات', s?'أنشئ فاتورة بيع جديدة وراجع الفواتير السابقة.':'سجّل فاتورة شراء جديدة وراجع الفواتير السابقة.')}
-  <div class="org-stats inv-stats">
-    <div class="org-stat"><span>عدد الفواتير</span><b>${L.length}</b><small>إجمالي ${fmt(sumTotal)}</small></div>
-    <div class="org-stat"><span>المدفوع</span><b>${fmt(paidTotal)}</b><small>من الفواتير الحالية</small></div>
-    <div class="org-stat"><span>المتبقي</span><b>${fmt(outTotal)}</b><small>${s?'مستحق من العملاء':'مستحق للموردين'}</small></div>
+  return `${sectionHead(s?'فاتورة بيع':'فاتورة شراء', s?'أدخل بيانات الفاتورة والبنود ثم احفظ.':'سجّل فاتورة الشراء والبنود ثم احفظ.')}
+  <div class="doc-bar">
+    <button class="btn" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ</button>
+    <button class="btn soft" onclick="cart.${k}=[];R()">فاتورة جديدة</button>
+    <button class="btn soft" onclick="R()">تحديث</button>
+    <button class="btn soft" onclick="go('dash')">إغلاق</button>
   </div>
-  <div class="inv-layout">
-    <div class="card inv-compose">
-      <div class="card-title"><b>فاتورة جديدة</b><span class="chip info">${cr.length} بند</span></div>
-      <div class="inv-fields">
-        <label>${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
-        <label>المخزن<select id="iw">${O(C.warehouses)}</select></label>
-      </div>
-      <div class="inv-add">
-        <label class="grow">الصنف<select id="il">${O(C.products.filter(p=>p.active))}</select></label>
-        <label>الكمية<input id="iq" type="number" value="1"></label>
-        <label>السعر<input id="ir" type="number" placeholder="تلقائي"></label>
-        <label>الخصم<input id="id" type="number" value="0"></label>
-        <button class="btn" onclick="addLine('${k}')">+ إضافة بند</button>
-      </div>
-      ${cartTable(k)||'<p class="muted inv-empty">لم تُضف بنود بعد.</p>'}
-      <div class="inv-fields">
-        <label>خصم كلي على الفاتورة<input id="ig" type="number" value="0" oninput="invSum('${k}')"></label>
-      </div>
-      ${payBox}
-      <div class="inv-actions"><button class="btn" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ الفاتورة</button></div>
+  <div class="card np doc-head">
+    <div class="doc-box"><span>رقم الفاتورة</span><b>يُولَّد عند الحفظ</b></div>
+    <div class="doc-box"><span>التاريخ</span><b>${today}</b></div>
+    <div class="doc-box"><span>الحالة</span><b id="docStatus">آجلة</b></div>
+    <label class="doc-f">${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
+    <label class="doc-f">المخزن<select id="iw">${O(C.warehouses)}</select></label>
+    ${payFields}
+  </div>
+  <div class="card np">
+    <div class="table-wrap"><table class="doc-grid">
+      <thead><tr><th class="ln">#</th><th>الصنف</th><th class="num">الكمية</th><th class="num">السعر</th><th class="num">الخصم</th><th class="num">الإجمالي</th><th class="num"></th></tr></thead>
+      <tbody>${lines.join('')}${entry}</tbody>
+    </table></div>
+    <div class="doc-tiles">
+      <div class="tile"><span>المجموع</span><b id="invSub">${fmt(tot)}</b></div>
+      <div class="tile"><span>خصم كلي على الفاتورة</span><input id="ig" type="number" value="0" oninput="invSum('${k}')"></div>
+      <div class="tile"><span>الصافي</span><b id="invNet">${fmt(tot)}</b></div>
+      <div class="tile"><span>المدفوع</span><b id="invPaid">${fmt(0)}</b></div>
+      <div class="tile"><span>المتبقي</span><b id="invRem">${fmt(tot)}</b></div>
     </div>
-    <aside class="card inv-summary">
-      <div class="card-title"><b>ملخص الفاتورة</b></div>
-      <div class="inv-line"><span>مجموع البنود</span><b id="invSub">${fmt(tot)}</b></div>
-      <div class="inv-line"><span>الإجمالي بعد الخصم</span><b id="invNet">${fmt(Math.max(0,tot-0))}</b></div>
-      <p class="muted inv-note">الضريبة تُحسب حسب إعدادات الشركة عند الحفظ.</p>
-    </aside>
+    <p class="muted inv-note">الضريبة تُحسب حسب إعدادات الشركة عند الحفظ.</p>
   </div>
   <div class="card">
     <div class="card-title"><b>الفواتير السابقة</b><input class="inv-search" placeholder="بحث بالرقم أو الاسم" oninput="invFilter(this.value)"></div>
@@ -735,6 +738,24 @@ async function printInvoice(id,s){
 .inv-table{width:100%;border-collapse:collapse}
 .inv-table th{background:#f8fafc;color:#667085;font-size:12px;text-align:right;padding:10px}
 .inv-table td{padding:10px;border-top:1px solid #f0f2f5}
+.doc-bar{display:flex;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e4e7ec;border-radius:10px;padding:8px;margin-bottom:12px;position:sticky;top:0;z-index:2}
+.doc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.doc-f{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#667085;font-weight:700}
+.doc-box{border:1px solid #d0d5dd;border-radius:8px;padding:8px 10px;background:#f8fafc;display:flex;flex-direction:column;gap:4px}
+.doc-box span{font-size:12px;color:#667085;font-weight:700}
+.doc-box b{font-size:14px}
+.doc-grid{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+.doc-grid th{background:#eef2f7;color:#344054;font-size:12px;padding:8px;text-align:right;border:1px solid #d0d5dd}
+.doc-grid td{padding:5px;border:1px solid #e4e7ec;vertical-align:middle}
+.doc-grid .num{text-align:center;width:100px}
+.doc-grid .ln{text-align:center;width:40px;color:#667085;background:#f8fafc}
+.doc-grid input,.doc-grid select{width:100%;margin:0;min-width:0}
+.doc-grid tr.entry td{background:#fffbeb}
+.doc-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0 4px}
+.tile{border:1px solid #d0d5dd;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;background:#fff}
+.tile span{font-size:12px;color:#667085;font-weight:700}
+.tile b{font-size:18px}
+.tile input{margin:0}
 .btn.sm{padding:6px 12px;font-size:12px}
 </style></head><body>
       <div class="head">
