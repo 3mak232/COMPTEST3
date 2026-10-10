@@ -541,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.32';
+const APP_VERSION='v1.33';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -630,6 +630,46 @@ function invFilter(q){
   document.querySelectorAll('#invBody tr').forEach(r=>{r.style.display=(!q||(r.dataset.s||'').includes(q))?'':'none'});
 }
 // --- v1.32: شاشة فاتورة بشكل المستند (زي البرنامج المكتبي): هيدر، جدول بنود قابل للتعديل، إجماليات، أزرار ---
+// --- v1.33: اختيار العميل/المورد بالبحث (زي خانة الصنف) ---
+window.ixParty=window.ixParty||{};
+function getWho(k){return k==='s'?C.customers:C.suppliers}
+function partySelHtml(k,x){return `<div class="pk-chip"><div><b>${e(x.name)}</b><small>${e(x.phone||'بدون رقم هاتف')}</small></div><button type="button" class="pk-x" title="تغيير" onclick="partyClear('${k}')">×</button></div>`}
+function partyHtml(k){
+  const sel=getWho(k).find(x=>x.id===window.ixParty[k]);
+  return `<div class="df df-party"><span>${k==='s'?'العميل':'المورد'}</span><div class="pk">
+    <input type="hidden" id="ip" value="${sel?sel.id:''}">
+    <input id="pkQ" type="search" placeholder="ابحث بالاسم أو رقم الهاتف، واضغط Enter" autocomplete="off" style="${sel?'display:none':''}" oninput="partySearch('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();partyPickFirst('${k}')}">
+    <div id="pkRes" class="doc-res"></div>
+    <div id="pkSel" style="${sel?'':'display:none'}">${sel?partySelHtml(k,sel):''}</div>
+  </div></div>`;
+}
+function partySearch(k,q){
+  const box=document.getElementById('pkRes');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.innerHTML='';return}
+  const list=getWho(k).filter(x=>[x.name,x.phone].join(' ').toLowerCase().includes(q)).slice(0,8);
+  box.innerHTML=list.length?list.map(x=>`<button type="button" class="doc-res-item" onclick="partyPick('${k}','${x.id}')"><b>${e(x.name)}</b><small>${e(x.phone||'بدون رقم هاتف')}</small></button>`).join(''):`<div class="doc-res-empty">لا يوجد ${k==='s'?'عميل':'مورد'} بهذا الاسم أو الرقم</div>`;
+}
+function partyPickFirst(k){const b=document.querySelector('#pkRes .doc-res-item');if(b)b.click()}
+function partyPick(k,id){
+  const x=getWho(k).find(r=>r.id===id);if(!x)return;
+  window.ixParty[k]=id;
+  document.getElementById('ip').value=id;
+  document.getElementById('pkQ').style.display='none';
+  document.getElementById('pkQ').value='';
+  document.getElementById('pkRes').innerHTML='';
+  const s=document.getElementById('pkSel');s.innerHTML=partySelHtml(k,x);s.style.display='';
+}
+function partyClear(k){
+  window.ixParty[k]=null;
+  document.getElementById('ip').value='';
+  const s=document.getElementById('pkSel');s.innerHTML='';s.style.display='none';
+  const q=document.getElementById('pkQ');q.style.display='';q.value='';q.focus();
+}
+async function invSave(s){
+  if(!v('ip'))throw Error(s?'اختار العميل أولاً':'اختار المورد أولاً');
+  return saveInvoice(s);
+}
 function invSearch(k,q){
   const box=document.getElementById('invRes');if(!box)return;
   q=(q||'').trim().toLowerCase();
@@ -696,14 +736,14 @@ async function invoiceView(s){
     <div class="doc-toolbar">
       <div class="doc-title"><b>${s?'فاتورة بيع':'فاتورة شراء'}</b><span>رقم يتولد عند الحفظ</span></div>
       <div class="doc-actions">
-        <button type="button" class="doc-btn primary" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ</button>
+        <button type="button" class="doc-btn primary" onclick="act(()=>invSave(${s?'true':'false'}))">حفظ</button>
         <button type="button" class="doc-btn" onclick="invNew('${k}')">فاتورة جديدة</button>
         <button type="button" class="doc-btn" onclick="R('soft')">تحديث</button>
         <button type="button" class="doc-btn" onclick="go('dash')">إغلاق</button>
       </div>
     </div>
     <div class="doc-head">
-      <label class="df">${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
+      ${partyHtml(k)}
       <label class="df">المخزن<select id="iw">${O(C.warehouses)}</select></label>
       <div class="df"><span>التاريخ</span><b>${today}</b></div>
       <div class="df"><span>الحالة</span><b id="docStatus">آجلة</b></div>
@@ -843,6 +883,36 @@ async function printInvoice(id,s){
 .tl b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl.big{background:var(--blue);border-color:var(--blue)}
 .tl.big span,.tl.big b{color:#fff}
+/* --- v1.33: خانات الإدخال --- */
+.doc-head{gap:16px 14px;padding:18px 18px 16px}
+.df{gap:6px;font-size:12px;color:#475467;font-weight:600;letter-spacing:.1px}
+.df input:not([type=hidden]),.df select,.tl input,.doc-tbl input{width:100%;height:42px;border:1px solid #d0d5dd;border-radius:10px;padding:0 12px;background:#fff;color:#172033;font-size:14px;font-weight:500;font-family:inherit;transition:border-color .15s,box-shadow .15s,background .15s;-webkit-appearance:none;appearance:none;box-shadow:0 1px 1px rgba(16,24,40,.03)}
+.df input::placeholder,.doc-search input::placeholder,.doc-tbl input::placeholder{color:#98a2b3;font-weight:400}
+.df input:hover,.df select:hover,.tl input:hover,.doc-tbl input:hover{border-color:#98a2b3}
+.df select{padding-inline-end:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%2364748b' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 12px center;cursor:pointer}
+.df input:not([type=hidden]):focus,.df select:focus,.tl input:focus,.doc-tbl input:focus,.doc-search input:focus,.pk input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.12);background:#fff}
+.df input[type=number],.tl input,.doc-tbl input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+.doc-tbl input{height:36px;text-align:center}
+.df>b,.df>span+b{height:42px;padding:0 12px;border-radius:10px;background:#f8fafc;border:1px dashed #d0d5dd;color:#344054;font-size:14px;font-weight:600}
+.df .note{height:auto;padding:10px 12px;font-weight:500;font-size:12px;line-height:1.6;color:#667085;border-style:solid;border-color:#e4e7ec}
+.doc-totals{gap:12px}
+.tl{border-color:#e4e7ec;padding:12px 14px;gap:6px}
+.tl span{font-size:12px;color:#667085;font-weight:600}
+.tl b{font-size:17px;font-variant-numeric:tabular-nums;color:#172033}
+.tl input{height:38px;font-weight:700}
+.tl.big b{color:#fff}
+.doc-search input{height:46px;border-radius:12px;padding:0 44px 0 16px;font-size:15px;border-color:#d0d5dd;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2398a2b3' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat right 16px center}
+.doc-res{border-radius:12px;box-shadow:0 12px 32px rgba(16,24,40,.12);border-color:#e4e7ec}
+.pk{position:relative;display:flex;flex-direction:column;gap:0}
+.pk input[type=search]{width:100%;height:42px;border:1px solid #d0d5dd;border-radius:10px;padding:0 12px;background:#fff;color:#172033;font-size:14px;font-family:inherit;appearance:none;-webkit-appearance:none}
+.pk .doc-res{top:calc(100% + 4px)}
+.pk-chip{display:flex;justify-content:space-between;align-items:center;gap:10px;height:42px;padding:0 6px 0 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px}
+.pk-chip b{display:block;font-size:14px;color:#172033;line-height:1.2}
+.pk-chip small{color:#475467;font-size:11px}
+.pk-x{width:28px;height:28px;border-radius:50%;border:0;background:#fff;color:#475467;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 1px 2px rgba(16,24,40,.1)}
+.pk-x:hover{color:#c9362b}
+.doc-tbl input[type=number]{font-weight:500}
+@media(max-width:760px){.df input:not([type=hidden]),.df select,.pk input[type=search]{height:44px}}
 @media(max-width:760px){
   .doc-tbl{min-width:0}
   .doc-tbl thead{display:none}
