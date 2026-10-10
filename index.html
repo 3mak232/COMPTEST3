@@ -541,7 +541,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.28';
+const APP_VERSION='v1.29';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -604,6 +604,160 @@ async function orgView(){
     <div class="card"><div class="card-title"><b>الفروع</b><span class="chip info">${B.length}</span></div><div class="org-list">${items(B,'فرع')}</div></div>
     <div class="card"><div class="card-title"><b>مراكز التكلفة</b><span class="chip info">${CC.length}</span></div><div class="org-list">${items(CC,'مركز تكلفة')}</div></div>
   </div>`;
+}
+
+// --- v1.29: فواتير البيع والمشتريات (تعريف لاحق يحل محل القديم) ---
+function invStatus(x){
+  if(x.status==='Void')return ['ملغاة','danger'];
+  if(Number(x.outstanding)<=0)return ['مدفوعة','success'];
+  if(Number(x.allocated_paid)>0)return ['مدفوعة جزئياً','warning'];
+  return ['آجلة','info'];
+}
+function invSum(k){
+  const tot=(cart[k]||[]).reduce((a,l)=>a+l.qty*l.price-l.discount,0);
+  const net=Math.max(0,tot-n('ig'));
+  const a=document.getElementById('invSub'),b=document.getElementById('invNet');
+  if(a)a.textContent=fmt(tot);
+  if(b)b.textContent=fmt(net);
+}
+function invFilter(q){
+  q=(q||'').trim().toLowerCase();
+  document.querySelectorAll('#invBody tr').forEach(r=>{r.style.display=(!q||(r.dataset.s||'').includes(q))?'':'none'});
+}
+async function invoiceView(s){
+  const k=s?'s':'p', cr=cart[k]||[];
+  const tot=cr.reduce((a,l)=>a+l.qty*l.price-l.discount,0);
+  const [L,CO]=await Promise.all([g(s?'sales_invoice_balances':'purchase_invoice_balances','date'), g('company_settings').then(x=>x[0]||{})]);
+  const finance=me&&(me.role==='admin'||me.role==='accountant');
+  const who=s?C.customers:C.suppliers;
+  const payBox=finance
+    ?`<div class="inv-pay"><label>المدفوع<input id="ipd" type="number" value="0"></label><label>الحساب المالي<select id="ia"><option value="">—</option>${O(C.accts)}</select></label><label>طريقة الدفع<select id="im"><option value="credit">آجل / جزء آجل</option><option value="cash">نقدي</option><option value="bank">بنك</option><option value="wallet">محفظة</option></select></label></div>`
+    :`<div class="inv-pay"><p class="muted">الفاتورة تُحفظ آجلة على الحساب، والدفع المباشر غير متاح لهذا الدور.</p></div>`;
+  const rows=L.slice().reverse().map(x=>{
+    const party=(by(who,s?x.customer_id:x.supplier_id).name)||'—';
+    const [st,cls]=invStatus(x);
+    return `<tr data-s="${e((x.number+' '+party).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(party)}</td><td>${fmt(x.total)}</td><td>${fmt(x.allocated_paid)}</td><td>${fmt(x.outstanding)}</td><td><span class="chip ${cls}">${st}</span></td><td><button class="btn soft sm" onclick="printInvoice('${x.id}',${s})">طباعة</button></td></tr>`;
+  }).join('');
+  const paidTotal=L.reduce((a,x)=>a+Number(x.allocated_paid||0),0), outTotal=L.reduce((a,x)=>a+Number(x.outstanding||0),0), sumTotal=L.reduce((a,x)=>a+Number(x.total||0),0);
+  return `${sectionHead(s?'فواتير المبيعات':'فواتير المشتريات', s?'أنشئ فاتورة بيع جديدة وراجع الفواتير السابقة.':'سجّل فاتورة شراء جديدة وراجع الفواتير السابقة.')}
+  <div class="org-stats inv-stats">
+    <div class="org-stat"><span>عدد الفواتير</span><b>${L.length}</b><small>إجمالي ${fmt(sumTotal)}</small></div>
+    <div class="org-stat"><span>المدفوع</span><b>${fmt(paidTotal)}</b><small>من الفواتير الحالية</small></div>
+    <div class="org-stat"><span>المتبقي</span><b>${fmt(outTotal)}</b><small>${s?'مستحق من العملاء':'مستحق للموردين'}</small></div>
+  </div>
+  <div class="inv-layout">
+    <div class="card inv-compose">
+      <div class="card-title"><b>فاتورة جديدة</b><span class="chip info">${cr.length} بند</span></div>
+      <div class="inv-fields">
+        <label>${s?'العميل':'المورد'}<select id="ip">${O(who)}</select></label>
+        <label>المخزن<select id="iw">${O(C.warehouses)}</select></label>
+      </div>
+      <div class="inv-add">
+        <label class="grow">الصنف<select id="il">${O(C.products.filter(p=>p.active))}</select></label>
+        <label>الكمية<input id="iq" type="number" value="1"></label>
+        <label>السعر<input id="ir" type="number" placeholder="تلقائي"></label>
+        <label>الخصم<input id="id" type="number" value="0"></label>
+        <button class="btn" onclick="addLine('${k}')">+ إضافة بند</button>
+      </div>
+      ${cartTable(k)||'<p class="muted inv-empty">لم تُضف بنود بعد.</p>'}
+      <div class="inv-fields">
+        <label>خصم كلي على الفاتورة<input id="ig" type="number" value="0" oninput="invSum('${k}')"></label>
+      </div>
+      ${payBox}
+      <div class="inv-actions"><button class="btn" onclick="act(()=>saveInvoice(${s?'true':'false'}))">حفظ الفاتورة</button></div>
+    </div>
+    <aside class="card inv-summary">
+      <div class="card-title"><b>ملخص الفاتورة</b></div>
+      <div class="inv-line"><span>مجموع البنود</span><b id="invSub">${fmt(tot)}</b></div>
+      <div class="inv-line"><span>الإجمالي بعد الخصم</span><b id="invNet">${fmt(Math.max(0,tot-0))}</b></div>
+      <p class="muted inv-note">الضريبة تُحسب حسب إعدادات الشركة عند الحفظ.</p>
+    </aside>
+  </div>
+  <div class="card">
+    <div class="card-title"><b>الفواتير السابقة</b><input class="inv-search" placeholder="بحث بالرقم أو الاسم" oninput="invFilter(this.value)"></div>
+    <div class="table-wrap"><table class="inv-table"><thead><tr><th>الرقم</th><th>التاريخ</th><th>${s?'العميل':'المورد'}</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="8" class="muted">لا توجد فواتير بعد.</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+async function printInvoice(id,s){
+  const w=window.open('','_blank');
+  if(!w){toast('اسمح بالنوافذ المنبثقة عشان تطبع');return}
+  w.document.write('<p style="font-family:sans-serif;padding:20px">جاري تجهيز الفاتورة...</p>');
+  try{
+    const tbl=s?'sales':'purchase';
+    const [hdr,bal,items,co]=await Promise.all([
+      sb.from(tbl+'_invoices').select('*').eq('id',id).single().then(r=>{if(r.error)throw r.error;return r.data}),
+      sb.from(tbl+'_invoice_balances').select('*').eq('id',id).single().then(r=>{if(r.error)throw r.error;return r.data}),
+      sb.from(tbl+'_invoice_items').select('qty,unit_price,discount,line_total,products(name)').eq('invoice_id',id).then(r=>{if(r.error)throw r.error;return r.data||[]}),
+      g('company_settings').then(x=>x[0]||{})
+    ]);
+    const who=s?C.customers:C.suppliers;
+    const party=(by(who,s?hdr.customer_id:hdr.supplier_id).name)||'—';
+    const [st]=invStatus(bal);
+    const rowsHtml=items.map((it,i)=>`<tr><td>${i+1}</td><td>${e(it.products?.name||'')}</td><td>${it.qty}</td><td>${fmt(it.unit_price)}</td><td>${fmt(it.discount)}</td><td>${fmt(it.line_total)}</td></tr>`).join('');
+    const logo=co.logo_url?`<img src="${e(co.logo_url)}" alt="" class="logo">`:'';
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${e(hdr.number)}</title><style>
+      @page{size:A4;margin:14mm}
+      body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#101828;margin:0;font-size:13px}
+      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1d4ed8;padding-bottom:14px}
+      .logo{max-height:56px;margin-bottom:6px}
+      .co b{font-size:18px}.co small{display:block;color:#475467;line-height:1.7}
+      .meta{text-align:left}.meta h1{margin:0;font-size:22px;color:#1d4ed8}.meta div{color:#475467;margin-top:4px}
+      .parties{display:flex;justify-content:space-between;margin:18px 0;gap:16px}
+      .box{flex:1;background:#f8fafc;border:1px solid #e4e7ec;border-radius:10px;padding:12px}
+      .box h4{margin:0 0 6px;color:#667085;font-size:12px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
+      th{background:#eef4ff;color:#1d4ed8;padding:9px;text-align:right;font-size:12px}
+      td{padding:9px;border-bottom:1px solid #eaecf0}
+      .totals{margin-top:14px;margin-right:auto;width:280px}
+      .totals div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #d0d5dd}
+      .totals .grand{font-size:16px;font-weight:800;border-bottom:2px solid #1d4ed8;color:#1d4ed8}
+      .notes{margin-top:18px;color:#475467;white-space:pre-line}
+      .sign{display:flex;justify-content:space-between;margin-top:46px;color:#667085}
+      .sign div{border-top:1px solid #98a2b3;width:200px;text-align:center;padding-top:6px}
+    .inv-stats{margin-bottom:14px}
+.inv-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start;margin-bottom:14px}
+@media (max-width:900px){.inv-layout{grid-template-columns:1fr}}
+.inv-fields,.inv-add{display:grid;gap:10px;margin:10px 0}
+.inv-fields{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.inv-add{grid-template-columns:minmax(180px,2fr) repeat(3,minmax(90px,1fr)) auto;align-items:end}
+.inv-add .grow{min-width:0}
+@media (max-width:900px){.inv-add{grid-template-columns:1fr 1fr}}
+.inv-add label,.inv-fields label,.inv-pay label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#667085;font-weight:700}
+.inv-pay{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}
+.inv-actions{display:flex;justify-content:flex-start;margin-top:12px}
+.inv-empty{padding:12px 0}
+.inv-summary{position:sticky;top:80px}
+.inv-line{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f2f5}
+.inv-line span{color:#667085}
+.inv-note{font-size:12px;margin-top:12px}
+.inv-search{max-width:260px}
+.table-wrap{overflow-x:auto}
+.inv-table{width:100%;border-collapse:collapse}
+.inv-table th{background:#f8fafc;color:#667085;font-size:12px;text-align:right;padding:10px}
+.inv-table td{padding:10px;border-top:1px solid #f0f2f5}
+.btn.sm{padding:6px 12px;font-size:12px}
+</style></head><body>
+      <div class="head">
+        <div class="co">${logo}<b>${e(co.company_name||'')}</b><small>${e(co.address||'')}${co.phone?'<br>هاتف: '+e(co.phone):''}${co.tax_number?'<br>الرقم الضريبي: '+e(co.tax_number):''}</small></div>
+        <div class="meta"><h1>${s?'فاتورة بيع':'فاتورة شراء'}</h1><div>رقم: <b>${e(hdr.number)}</b></div><div>التاريخ: ${e(hdr.date||'')}</div>${hdr.due_date?'<div>الاستحقاق: '+e(hdr.due_date)+'</div>':''}<div>الحالة: ${st}</div></div>
+      </div>
+      <div class="parties"><div class="box"><h4>${s?'العميل':'المورد'}</h4><b>${e(party)}</b></div></div>
+      <table><thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الخصم</th><th>الإجمالي</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+      <div class="totals">
+        <div><span>المجموع الفرعي</span><b>${fmt(bal.subtotal)}</b></div>
+        <div><span>الخصم</span><b>${fmt(bal.discount)}</b></div>
+        <div><span>الضريبة</span><b>${fmt(bal.tax)}</b></div>
+        <div class="grand"><span>الإجمالي</span><b>${fmt(bal.total)}</b></div>
+        <div><span>المدفوع</span><b>${fmt(bal.allocated_paid)}</b></div>
+        <div><span>المتبقي</span><b>${fmt(bal.outstanding)}</b></div>
+      </div>
+      ${hdr.notes?'<div class="notes"><b>ملاحظات:</b>\n'+e(hdr.notes)+'</div>':''}
+      <div class="sign"><div>توقيع المستلم</div><div>توقيع المسؤول</div></div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script></body></html>`;
+    w.document.open(); w.document.write(html); w.document.close();
+  }catch(x){
+    w.document.open(); w.document.write('<p style="font-family:sans-serif;padding:20px">تعذر تحميل الفاتورة: '+e(x.message||x)+'</p>'); w.document.close();
+  }
 }
 </script>
 </body></html>
