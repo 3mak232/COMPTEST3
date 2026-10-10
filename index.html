@@ -487,7 +487,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.46';
+const APP_VERSION='v1.47';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1097,7 +1097,7 @@ async function retView(){
   const itemsHtml=cur?`<div class="card np"><div class="card-title"><b>بنود الفاتورة ${e(cur.number)}</b><span class="muted">اكتب الكمية المرتجعة لكل صنف ثم احفظ</span></div>${T(['الصنف','الكمية في الفاتورة','سعر الوحدة','كمية المرتجع'],cur.items.map((x,i)=>[e((by(C.products,x.product_id).name)||'—'),fmt(x.qty),fmt(x.unit_price),`<input id="rq${i}" type="number" step="0.001" min="0" value="0" style="width:110px">`]))}<div class="row"><button onclick="retSave()">حفظ المرتجع</button><button class="s" onclick="RT=null;R('soft')">إلغاء</button></div></div>`:'';
   const rows=RS.slice().reverse().map(x=>[e(x.number),x.date,e((by(L,x.invoice_id).number)||'—'),e((by(sel?C.customers:C.suppliers,sel?x.customer_id:x.supplier_id).name)||'—'),fmt(x.total),`<button class="s" onclick="retPrint('${x.id}',${sel})">طباعة</button>`]);
   return sectionHead('المرتجعات','مرتجع مرتبط بفاتورة، يُحفظ ويُطبع كمستند.')+
-    `<div class="card np"><div class="row"><select id="rk" onchange="window._rk=v('rk');RT=null;R('soft')"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select><select id="ri">${L.slice().reverse().map(x=>`<option value="${x.id}">${e(x.number)} — ${fmt(x.total)}</option>`).join('')}</select><button class="s" onclick="loadRet()">عرض البنود</button></div></div>${itemsHtml}<div class="card"><b>المرتجعات المسجلة</b>${T(['الرقم','التاريخ','الفاتورة','الطرف','الإجمالي',''],rows)}</div>`;
+    `<div class="card np"><div class="row"><select id="rk" onchange="window._rk=v('rk');window._rp=null;RT=null;R('soft')"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select><select id="ri">${L.slice().reverse().map(x=>`<option value="${x.id}">${e(x.number)} — ${fmt(x.total)}</option>`).join('')}</select><button class="s" onclick="loadRet()">عرض البنود</button></div></div>${itemsHtml}<div class="card"><b>المرتجعات المسجلة</b>${T(['الرقم','التاريخ','الفاتورة','الطرف','الإجمالي',''],rows)}</div>`;
 }
 
 // ---------- قوائم الأسعار: عبر الدوال الصريحة + أقسام ----------
@@ -1425,19 +1425,22 @@ async function retView(){
   const sel=window._rk!=='p', title=sel?'مرتجع مبيعات':'مرتجع مشتريات';
   const[SI,PI,RS]=await Promise.all([g('sales_invoices','date'),g('purchase_invoices','date'),g(sel?'sales_returns':'purchase_returns','date')]);
   const L=sel?SI:PI, who=sel?C.customers:C.suppliers;
-  const kindSel=`<select id="rk" onchange="window._rk=v('rk');RT=null;R('soft')"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select>`;
+  const kindSel=`<select id="rk" onchange="window._rk=v('rk');window._rp=null;RT=null;R('soft')"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select>`;
   if(mode==='list'){
     const rows=RS.slice().reverse().map(x=>{const pn=(by(who,sel?x.customer_id:x.supplier_id).name)||'—';const inv=(by(L,x.invoice_id).number)||'—';return `<tr data-s="${e((x.number+' '+inv+' '+pn+' '+(x.date||'')).toLowerCase())}"><td><b>${e(x.number)}</b></td><td>${e(x.date||'')}</td><td>${e(inv)}</td><td>${e(pn)}</td><td>${fmt(x.total)}</td><td><button class="btn soft sm" onclick="retPrint('${x.id}',${sel})">طباعة</button></td></tr>`}).join('');
     return ixBar('r','المرتجعات السابقة',title)+`<div class="card ix-list"><div class="ix-list-head"><div><b>كل المرتجعات</b><small>${RS.length} مرتجع</small></div><input class="inv-search" type="search" placeholder="ابحث بالرقم أو الاسم أو التاريخ" oninput="invFilter(this.value)"></div><div class="table-wrap"><table class="inv-table"><thead><tr><th>الرقم</th><th>التاريخ</th><th>الفاتورة</th><th>${sel?'العميل':'المورد'}</th><th>الإجمالي</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد مرتجعات بعد</td></tr>'}</tbody></table></div></div>`;
   }
   if(mode==='new'){
     const cur=(RT&&RT.s===sel)?RT:null;
-    const invOpts=L.slice().reverse().map(x=>`<option value="${x.id}" ${cur&&cur.id===x.id?'selected':''}>${e(x.number)} — ${fmt(x.total)}</option>`).join('');
+    const pid=window._rp||'',pk=sel?'customer_id':'supplier_id';
+    const pOpts=`<option value="">${sel?'اختر العميل':'اختر المورد'}</option>`+who.map(x=>`<option value="${x.id}" ${pid===x.id?'selected':''}>${e(x.name)}</option>`).join('');
+    const invList=pid?L.filter(x=>x[pk]===pid):[];
+    const invOpts=`<option value="">${pid?(invList.length?'اختر الفاتورة':'لا توجد فواتير لهذا الطرف'):(sel?'اختر العميل الأول':'اختر المورد الأول')}</option>`+invList.slice().reverse().map(x=>`<option value="${x.id}" ${cur&&cur.id===x.id?'selected':''}>${e(x.number)} — ${fmt(x.total)}</option>`).join('');
     const rowsHtml=cur?cur.items.map((x,i)=>`<tr><td class="c-n">${i+1}</td><td><b>${e((by(C.products,x.product_id).name)||'—')}</b></td><td class="c-q">${fmt(x.qty)}</td><td class="c-p">${fmt(x.unit_price)}</td><td class="c-q"><input id="rq${i}" type="number" step="0.001" min="0" value="0" oninput="retRecalc()" style="width:110px"></td><td class="c-t" id="rt${i}">0</td></tr>`).join(''):'<tr><td colspan="6" class="muted">اختار الفاتورة واضغط "عرض البنود".</td></tr>';
     return ixBar('r','إنشاء مرتجع جديد',title)+`<div class="doc">
       <div class="doc-toolbar"><div class="doc-title"><b>${title}</b><span>اكتب الكمية المرتجعة لكل صنف، ثم احفظ</span></div>
         <div class="doc-actions"><button type="button" class="doc-btn primary" onclick="retSave()" ${cur?'':'disabled'}>حفظ المرتجع</button><button type="button" class="doc-btn" onclick="RT=null;R('soft')">تفريغ</button></div></div>
-      <div class="doc-head"><div class="df"><span>النوع</span>${kindSel}</div><label class="df wide">الفاتورة<select id="ri">${invOpts}</select></label><div class="df"><span>&nbsp;</span><button type="button" class="doc-btn" onclick="loadRet()">عرض البنود</button></div></div>
+      <div class="doc-head"><div class="df"><span>النوع</span>${kindSel}</div><label class="df">${sel?'العميل':'المورد'}<select id="rp" onchange="window._rp=v('rp');RT=null;R('soft')">${pOpts}</select></label><label class="df wide">الفاتورة<select id="ri">${invOpts}</select></label><div class="df"><span>&nbsp;</span><button type="button" class="doc-btn" onclick="loadRet()">عرض البنود</button></div></div>
       <div class="doc-grid-wrap"><table class="doc-tbl"><thead><tr><th class="c-n">#</th><th>الصنف</th><th class="c-q">الكمية بالفاتورة</th><th class="c-p">السعر</th><th class="c-q">كمية المرتجع</th><th class="c-t">التقدير</th></tr></thead><tbody id="retRows">${rowsHtml}</tbody></table></div>
       <div class="doc-foot"><span class="doc-count">${cur?cur.items.length+' بند':''}</span><div class="doc-totals"><div class="tl big"><span>تقدير قيمة المرتجع</span><b id="retTot">0</b></div></div></div>
       <p class="muted">التقدير بيحسب بالسعر قبل الضريبة والخصم. القيمة النهائية بتتحسب على السيرفر عند الحفظ.</p></div>`;
@@ -1494,6 +1497,73 @@ async function expensesView(){
 
 // ---------- الخزينة: أسماء المصادر (بما فيها الحركات القديمة المرحّلة) ----------
 Object.assign(LEDGER_SRC,{record_initial_payment:'دفعة مع فاتورة',backfill_payment:'دفعة (قبل التحديث)',backfill_expense:'مصروف (قبل التحديث)',backfill_transfer:'تحويل (قبل التحديث)',backfill_payroll:'مرتب (قبل التحديث)'});
+
+
+// ---------- v1.47: تسجيل الدخول، القائمة الجانبية، أرصدة الخزينة، المرتجع بالعميل ----------
+// 1) الدخول: رسالة واضحة لو البيانات غلط أو في مشكلة اتصال
+function loginMsg(t){let el=document.getElementById('lerr');if(!el){el=document.createElement('div');el.id='lerr';el.setAttribute('role','alert');el.style.cssText='color:#b42318;background:#fef3f2;border:1px solid #fecdca;border-radius:12px;padding:10px 12px;margin-top:12px;font-size:13px;font-weight:700';document.querySelector('.login-card')?.appendChild(el)}el.textContent=t||'';el.hidden=!t}
+async function login(){
+  const email=(v('lu')||'').trim(),pass=v('lp')||'';
+  loginMsg('');
+  if(!email||!pass)return loginMsg('اكتب البريد الإلكتروني وكلمة المرور');
+  try{
+    await withLoading(async()=>{const{error}=await sb.auth.signInWithPassword({email,password:pass});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان');
+  }catch(x){
+    const m=String(x?.message||x?.error_description||x||'');
+    if(/invalid login|invalid_credentials|invalid.*(credential|password)/i.test(m))return loginMsg('البريد الإلكتروني أو كلمة المرور غلط');
+    if(/email not confirmed/i.test(m))return loginMsg('الحساب لسه متفعلش. كلم الأدمن');
+    if(/fetch|network|failed to/i.test(m))return loginMsg('مفيش اتصال بالسيرفر. اتأكد من الإنترنت وحاول تاني');
+    loginMsg('تعذر تسجيل الدخول: '+m);
+  }
+}
+document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&(ev.target?.id==='lu'||ev.target?.id==='lp')&&document.getElementById('lp'))login()});
+
+// 2) القائمة الجانبية: تتحدّث فوراً بدون إعادة تحميل كل البيانات
+function navPaintNow(){const l=renderNavGroups();const nv=$('nav');if(nv){nv.innerHTML=l;window._lastLinks=l}const mb=$('.mobile-bottom');if(mb)mb.innerHTML=bottomNav()}
+function navGo(){if(C&&me&&me.active&&can(view)){const stale=Date.now()-(window._lastLoad||0)>=60000;const p=paintView('soft');if(stale)loadAll(true).then(()=>paintView('soft')).catch(()=>{});return p}return R('soft')}
+function go(vw){window.ixMode={};if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();navPaintNow();showPlaceholder();return navGo()}
+function goBack(){const p=(window._nav||[]).pop();if(!p)return;view=p;localStorage.setItem('erp_v_view',p);closeMobileNav?.();navPaintNow();showPlaceholder();return navGo()}
+function toggleNavGroup(gid,ev){ev.preventDefault();ev.stopPropagation();let state={};try{state=JSON.parse(localStorage.getItem('erp_v_nav_groups')||'{}')}catch{};const open=state[gid]===false?true:state[gid]===undefined?true:false;Object.keys(state).forEach(k=>{state[k]=false});state[gid]=open;localStorage.setItem('erp_v_nav_groups',JSON.stringify(state));navPaintNow()}
+
+// 3) الخزينة: الرصيد الافتتاحي والختامي لكل حساب ولكل يوم
+// بداية اليوم بتوقيت القاهرة (بتحسب الصيف والشتا)
+function cairoDayStart(day){const base=Date.parse(day+'T00:00:00Z');for(const off of [-2,-3,-1]){const t=base+off*3600e3;if(cday(t)===day&&cday(t-1)!==day)return new Date(t).toISOString()}return new Date(base-2*3600e3).toISOString()}
+function nextDayKey(day){return new Date(Date.parse(day+'T12:00:00Z')+86400e3).toISOString().slice(0,10)}
+async function cashLedgerHtml(){
+  const day=dyGet('led');
+  const a=cairoDayStart(day),b=cairoDayStart(nextDayKey(day));
+  const[res,PN,obRows,cbRows]=await Promise.all([
+    sb.from('cash_movements').select('*').gte('created_at',a).lt('created_at',b).order('created_at',{ascending:false}).limit(3000),
+    profNames(),rpc('cash_balances_at',{p_ts:a}),rpc('cash_balances_at',{p_ts:b})]);
+  if(res.error)throw res.error;
+  const L=res.data||[];
+  const OB=Object.fromEntries((obRows||[]).map(x=>[x.account_id,+x.balance]));
+  const CB=Object.fromEntries((cbRows||[]).map(x=>[x.account_id,+x.balance]));
+  const an=id=>(by(C.accts,id).name)||'—';
+  let tin=0,tout=0;L.forEach(x=>{if(x.direction==='in')tin+=+x.amount;else tout+=+x.amount});
+  const tm=x=>new Date(x.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'});
+  const dl=new Date(day+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Cairo'});
+  // جدول الأرصدة لكل حساب
+  const per=C.accts.map(acc=>{
+    const mv=L.filter(x=>x.account_id===acc.id);
+    const inn=mv.filter(x=>x.direction==='in').reduce((s,x)=>s+ +x.amount,0);
+    const out=mv.filter(x=>x.direction!=='in').reduce((s,x)=>s+ +x.amount,0);
+    const open=OB[acc.id]??0, close=CB[acc.id]??+acc.balance;
+    return {acc,open,inn,out,close,diff:Math.round((close-(open+inn-out))*100)/100};
+  });
+  const sum=k=>per.reduce((s,r)=>s+r[k],0);
+  const balRows=per.map(r=>[e(r.acc.name),fmt(r.open),`<span class="good">${fmt(r.inn)}</span>`,`<span class="bad">${fmt(r.out)}</span>`,`<b>${fmt(r.close)}</b>`,Math.abs(r.diff)>0.005?`<span class="bad" title="حركات قبل تسجيل الحركات في النظام">${fmt(r.diff)}</span>`:'<span class="muted">—</span>']);
+  const balHead=['الحساب','الرصيد الافتتاحي','داخل','خارج','الرصيد الختامي (المقفول)','فرق غير مسجل'];
+  balRows.push([`<b>الإجمالي</b>`,`<b>${fmt(sum('open'))}</b>`,`<b>${fmt(sum('inn'))}</b>`,`<b>${fmt(sum('out'))}</b>`,`<b>${fmt(sum('close'))}</b>`,'']);
+  const balHtml=T(balHead,balRows);
+  const rows=L.map(x=>[tm(x),e(an(x.account_id)),x.direction==='in'?'<span class="good">داخل ＋</span>':'<span class="bad">خارج −</span>',fmt(x.amount),e(LEDGER_SRC[x.source]||x.source||'—'),e(PN[x.user_id]||'—')]);
+  const texts=L.map(x=>[an(x.account_id),LEDGER_SRC[x.source]||x.source||'',PN[x.user_id]||'',x.direction==='in'?'داخل':'خارج'].join(' '));
+  ptStore('led','حركة الخزينة — '+dl,'',['الوقت','الحساب','الاتجاه','المبلغ','المصدر','المستخدم'],L.map(x=>[tm(x),e(an(x.account_id)),x.direction==='in'?'داخل':'خارج',fmt(x.amount),e(LEDGER_SRC[x.source]||x.source||'—'),e(PN[x.user_id]||'—')]),`<h3>أرصدة الحسابات</h3>${balHtml}<p class="tot">داخل: ${fmt(tin)} · خارج: ${fmt(tout)} · الصافي: ${fmt(tin-tout)}</p>`);
+  return `${dayStrip('led',day)}<div class="card"><div class="card-title"><b>أرصدة ${e(dl)}</b><span class="muted">الافتتاحي = الرصيد أول اليوم، والختامي = الرصيد اللي اتقفل بيه اليوم</span></div>${balHtml}</div>`+
+    `<div class="card"><div class="card-title"><b>حركة ${e(dl)}</b><div class="row"><span class="chip success">داخل ${fmt(tin)}</span><span class="chip danger">خارج ${fmt(tout)}</span><span class="chip info">الصافي ${fmt(tin-tout)}</span><button class="s" onclick="ptPrint('led')">طباعة هذا اليوم</button></div></div>${lsCard('led',['الوقت','الحساب','الاتجاه','المبلغ','المصدر','المستخدم'],rows,texts,'ابحث بالحساب أو المصدر أو المستخدم...')}</div>`;
+}
+
+// 4) المرتجع بيتعمل من اختيار العميل (أو المورد) الأول، وبعدين الفاتورة بتاعته
 
 </script>
 </body></html>
