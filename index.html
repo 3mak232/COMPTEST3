@@ -488,7 +488,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.55';
+const APP_VERSION='v1.56';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1796,29 +1796,43 @@ async function showPartyStmt(){
   R();
 }
 function partyStmt(id){window._stp=id;st='';go('stmt')}
-// ===== v1.55: تبديل الأسلوب (عامية / فصحى) =====
-// النصوص الحالية هي الأساس (عامية)، والفصحى بتتطبق كتبديل على النصوص المعروفة في الواجهة.
-const DIALECT_MSA={
-  'عليه فلوس لينا':'مدين لنا','علينا فلوس ليه':'دائن لنا','متصفّر':'متوازن',
-  'لا توجد أطراف في هذا التبويب':'لا توجد أطراف في هذا التصنيف','لا توجد أطراف بعد':'لا توجد أطراف بعد',
-  'مفيش نتيجة':'لا توجد نتائج','اعرض الكشف':'اعرض الكشف','عرض الكشف':'عرض الكشف',
-  'ابحث عن الطرف':'ابحث عن الطرف','اكتب الاسم أو رقم الهاتف':'اكتب الاسم أو رقم الهاتف',
-  'اختار طرف':'اختر طرفاً','ابحث واختار الطرف':'ابحث واختر الطرف','اختار الطرف':'اختر الطرف',
-  'اختار':'اختر','تسجيل حضور':'تسجيل الحضور','تسجيل انصراف':'تسجيل الانصراف',
-  'حضوري النهارده':'حضوري اليوم','النهارده':'اليوم','اتعمل':'أُنشئ','اتحدّث':'حُدّث',
-  'اعرض الكشف الأول':'اعرض الكشف أولاً','اسمح بالنوافذ المنبثقة':'اسمح بالنوافذ المنبثقة'
-};
+// ===== v1.56: تبديل الأسلوب (عامية مصرية / فصحى) على الموقع كله =====
+// كل زوج: [العامية المصرية، الفصحى]. الاختيار بيتطبق على الشاشات وعلى الرسايل (alert/toast).
+// الأسماء اللي متشابهة في اللهجتين مش محتاجة تبديل، والتبديل بيغطي الأفعال والأدوات والجمل الشائعة.
+const DX_PAIRS=[
+  ['اختار ','اختر '],['اختار','اختر'],['النهارده','اليوم'],['مفيش نتيجة','لا توجد نتائج'],['مفيش ','لا يوجد '],['مفيش','لا يوجد'],
+  ['اتعمل','أُنشئ'],['اتحدّث','حُدّث'],['اتحدث','حُدّث'],['اتشال','أُزيل'],['اتصلح','أُصلح'],['اتفعل','فُعّل'],['اتضاف','أُضيف'],
+  ['متصفّر','متوازن'],['عليه فلوس لينا','مدين لنا'],['علينا فلوس ليه','دائن لنا'],
+  ['الحساب لسه متفعلش','الحساب لم يُفعّل بعد'],['كلم الأدمن','تواصل مع المسؤول'],
+  ['عايز ','أريد '],['عايزين ','نريد '],['عايزه','أريده'],['عايز','أريد'],['عشان ','لكي '],['علشان ','لكي '],
+  ['كده','هكذا'],['دلوقتي','الآن'],['بعدين','لاحقاً'],['طب ','حسناً، '],['ازاي','كيف'],['إزاي','كيف'],['فين','أين'],
+  ['ليه','لماذا'],['ماينفعش','لا يجوز'],['مينفعش','لا يجوز'],['تمام','حسناً'],['تقدر ','تستطيع '],['تقدر','تستطيع'],
+  ['بيتضاف','يُضاف'],['بيتحفظ','يُحفظ'],['بيبان','يظهر'],['بيظهر لي','يظهر لي'],['لسه ','بعد '],['حاجة ','شيء '],['حاجه ','شيء '],
+  ['كمان','أيضاً'],['برضو','أيضاً'],['أوي','جداً'],['قوي','جداً'],['خليها','اجعلها'],['خليه','اجعله'],['خلي ','اجعل '],
+  ['مش ','ليس '],['هنعمل','سنعمل'],['هنضيف','سنضيف'],['هنشيل','سنزيل'],['هنعدل','سنعدّل'],['هنعمل','سنعمل'],
+  ['ادوس','اضغط'],['دوس ','اضغط '],['بتاع ','الخاص بـ '],['بتاعت ','الخاصة بـ '],['بتاعة ','الخاصة بـ '],
+  ['اتقفل','أُغلق'],['اتقفلت','أُغلقت'],['اتحذف','حُذف'],['اتسجل','سُجّل'],['اتسجلت','سُجّلت'],['اتعطل','تعطّل'],
+];
+DX_PAIRS.sort((a,b)=>b[0].length-a[0].length);
 function dialectMode(){try{return localStorage.getItem('erp_dialect')||'eg'}catch{return 'eg'}}
+// ترجمة نص واحد حسب الأسلوب المختار
+function dx(s){
+  if(typeof s!=='string')return s;
+  const msa=dialectMode()==='msa';
+  let out=s;
+  for(const [eg,ms] of DX_PAIRS){
+    const from=msa?eg:ms, to=msa?ms:eg;
+    if(from!==to&&out.includes(from))out=out.split(from).join(to);
+  }
+  return out;
+}
 function applyDialect(root){
   if(!root)return;
-  const msa=dialectMode()==='msa';
-  const keys=Object.keys(DIALECT_MSA).sort((a,b)=>b.length-a.length);
   const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
   const nodes=[];let n;while((n=w.nextNode()))nodes.push(n);
   for(const t of nodes){
     if(t.__orig===undefined)t.__orig=t.nodeValue;
-    let out=t.__orig;
-    if(msa)for(const k of keys){if(out.includes(k))out=out.split(k).join(DIALECT_MSA[k])}
+    const out=dx(t.__orig);
     if(t.nodeValue!==out)t.nodeValue=out;
   }
 }
@@ -1828,6 +1842,11 @@ function toggleDialect(){
   applyDialect(document.getElementById('app'));
   if(typeof R==='function')R('soft');
 }
+// الرسايل المنبثقة والتوست بتتترجم كمان
+const _toastDx=toast;
+toast=function(m){return _toastDx(dx(m))};
+const _alertDx=window.alert.bind(window);
+window.alert=function(m){return _alertDx(dx(String(m)))};
 (function(){
   const app=document.getElementById('app');
   if(!app)return;
