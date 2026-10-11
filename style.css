@@ -469,3 +469,10 @@ body{background:#f4f6fa}
 .stmt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .stmt-head h3{margin:0}
 .stmt-open,.stmt-close{font-weight:800}
+/* الطباعة: المحتوى بس، من غير الشريط العلوي أو السفلي أو القائمة */
+@media print{
+  .mobile-bottom,.mobile-overlay,.topbar,.sidebar,.np,.app-version,.iconbtn,.btn.s.no-print{display:none!important}
+  .shell{margin:0!important;padding:0!important;display:block!important}
+  .page{padding:0!important;margin:0!important;background:#fff!important}
+  body{background:#fff!important}
+}
