@@ -264,8 +264,9 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.role==='admin'?settingsLink('int','التكاملات','إدارة الاتصالات والتكاملات الخارجية.','↔'):''}
   ${me.role==='admin'?settingsLink('audit','سجل العمليات','مراجعة العمليات والتغييرات.','⌁'):''}
   ${me.isDev?settingsLink('health','فحص الجاهزية','فحوصات الصحة وGo-Live.','♥'):''}
+  ${me.isDev?'<button class="settings-tile" onclick="pushAppUpdate()"><span class="settings-icon">⟳</span><span><b>تحديث لكل المستخدمين</b><small>يخلي كل المستخدمين يحملوا أحدث نسخة أوتوماتيك من غير Ctrl+F5.</small></span><span class="settings-arrow">‹</span></button>':''}
 </div>
-<div class="card"><div class="card-title"><b>إعدادات الشركة</b><span class="chip info">إعدادات أساسية</span></div><div class="row"><input id="sc" value="${e(s.company_name)}"><input id="sp" value="${e(s.invoice_prefix)}"><input id="stn" value="${e(s.tax_number)}" placeholder="الرقم الضريبي"><label><input type="checkbox" id="sn" ${s.negative_stock?'checked':''} ${me.role==='admin'?'':'disabled'}> السماح بالمخزون السالب</label><label><input type="checkbox" id="ste" ${s.tax_enabled?'checked':''} ${me.role==='admin'?'':'disabled'}> تفعيل الضريبة</label><input id="sx" type="number" value="${s.tax_pct}" style="width:100px" ${me.role==='admin'?'':'disabled'}><label>حد خصم المبيعات % <input id="sdm" type="number" step="0.01" min="0" max="100" value="${s.sales_discount_max_pct??5}" style="width:100px" ${me.role==='admin'?'':'disabled'}></label><small class="muted">أقصى خصم يقدر يديه دور المبيعات على الفاتورة، كنسبة من إجمالي الأصناف. الأدمن والمحاسب مالهمش حد.</small><div class="logo-up" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><img id="coLogoPv" src="${e(s.logo_url||'')}" alt="" style="max-height:52px;${s.logo_url?'':'display:none'}"><label class="btn soft sm">${me.role==='admin'?'رفع لوجو الشركة':'اللوجو'}<input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" ${me.role==='admin'?'':'disabled'} onchange="uploadCoLogo(this)"></label><small class="muted">PNG أو JPG أو WebP، أقل من 512 كيلو. بيظهر في الفواتير والمرتجعات والطباعة.</small></div>${me.role==='admin'?`<button onclick="act(()=>upd('company_settings',1,{company_name:v('sc'),invoice_prefix:v('sp'),tax_number:v('stn'),negative_stock:$('#sn').checked,tax_enabled:$('#ste').checked,tax_pct:n('sx'),sales_discount_max_pct:n('sdm')}))">حفظ</button>`:''}</div></div>
+${coCardHtml(s)}
 <div class="card offline-card"><b>النسخ الاحتياطي الكامل</b><p class="muted">النسخة التشغيلية من داخل النظام مخصصة للبيانات العملية. النسخة الكاملة لقاعدة PostgreSQL (الجداول، السياسات، الدوال، Auth) تظل على مستوى Supabase ولا يتم تنفيذها من متصفح المستخدم.</p></div>`}
 async function runSmokeTest(){const box=$('#smokeResult');if(box)box.innerHTML='<p>جاري الاختبار...</p>';try{const r=await rpc('run_erp_smoke_test',{});const show=z=>typeof z==='object'&&z!==null?JSON.stringify(z):String(z??'');const rows=(r.results||[]).map(x=>{const p=x.pass?'✓':'✗';const vals=Object.entries(x).filter(([k])=>!['test','pass'].includes(k)).map(([k,v])=>`${e(k)}=${e(show(v))}`).join(' | ');return`<div class="${x.pass?'good':'bad'}">${p} ${e(x.test)}${vals?' — '+vals:''}</div>`}).join('');if(box)box.innerHTML=`<div class="card"><b class="${r.ok?'good':'bad'}">${r.ok?'نجح اختبار النظام بالكامل':'فشل اختبار النظام'}</b>${rows}<p>تم تنظيف بيانات الاختبار: ${r.cleaned?'نعم':'لا'}</p></div>`}catch(x){if(box)box.innerHTML=`<div class="card bad">فشل تشغيل الاختبار: ${e(x.message||x)}</div>`}}
 function openMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.add('open');if(o)o.classList.add('open');document.body.classList.add('menu-open')}
@@ -295,6 +296,7 @@ function renderNavGroups(){
   return NAV_GROUPS.map(([title,ids,gid])=>{
     const items=ids.map(id=>NAV.find(x=>x[0]===id)).filter(x=>x&&visibleNav(x[0]));
     if(!items.length)return '';
+    if(items.length===1&&items[0][1]===title)return `<a class="nav-single${view===items[0][0]?' on':''}" onclick="go('${items[0][0]}')"><span class="nav-dot"></span><span>${title}</span></a>`;
     const isActive=activeGroup&&activeGroup[2]===gid;
     const collapsed=state[gid]===undefined?(gid==='overview'||isActive?'':' collapsed'):(state[gid]?'':' collapsed');
     return `<section class="nav-group${collapsed}" data-group="${gid}"><div class="nav-group-title" onclick="toggleNavGroup('${gid}',event)"><span>${title}</span><button class="nav-toggle" aria-label="فتح ${title}">${collapsed?'▸':'⌄'}</button></div><div class="group-items">${items.map(x=>`<a class="${view===x[0]?'on':''}" onclick="go('${x[0]}');event.stopPropagation()"><span class="nav-dot"></span><span>${x[1]}</span></a>`).join('')}</div></section>`;
@@ -355,7 +357,7 @@ async function priceView(){const [PL,IT]=await Promise.all([g('price_lists','nam
  <div class="card form-card"><div class="row"><input id="pln" placeholder="اسم قائمة الأسعار"><input id="plcur" value="EGP" placeholder="العملة"><button class="btn" onclick="act(()=>ins('price_lists',{name:v('pln'),currency:v('plcur')}))">إنشاء قائمة</button></div><hr><div class="row"><select id="pli">${O(PL)}</select><select id="plp">${O(C.products)}</select><input id="plprice" type="number" step="0.0001" placeholder="السعر"><input id="plmin" type="number" value="1" min="0.001" placeholder="الحد الأدنى"><button class="btn soft" onclick="act(()=>ins('price_list_items',{price_list_id:v('pli'),product_id:v('plp'),price:n('plprice'),min_qty:n('plmin')}))">إضافة سعر</button></div></div>
  <div class="card">${T(['القائمة','الصنف','الحد الأدنى','السعر'],IT.map(x=>[e(by(PL,x.price_list_id).name),e(by(C.products,x.product_id).name),x.min_qty,money(x.price)]))}</div>`}
 async function hrView(){const [E,L,Adj,Holi]=await Promise.all([g('employees','name'),g('leave_requests',null),g('employee_adjustments','effective_date'),g('holidays','holiday_date')]);const types=await g('leave_types','name');return `${sectionHead('الموارد البشرية','الحضور والغياب والإجازات والعطلات والمكافآت والجزاءات والربط مع الرواتب.')}
- <div class="card form-card"><div class="row"><select id="he">${O(E)}</select><input id="hd" type="date" value="${new Date().toISOString().slice(0,10)}"><input id="hi" type="datetime-local"><input id="ho" type="datetime-local"><select id="hs"><option>Present</option><option>Late</option><option>Absent</option><option>Leave</option><option>Holiday</option></select><button class="btn" onclick="act(()=>ins('attendance',{employee_id:v('he'),work_date:v('hd'),check_in:v('hi')||null,check_out:v('ho')||null,status:v('hs')}))">تسجيل حضور</button></div><hr><div class="row"><select id="hle">${O(E)}</select><select id="hlt">${O(types)}</select><input id="hf" type="date"><input id="ht" type="date"><input id="hlr" placeholder="السبب"><button class="btn soft" onclick="act(()=>ins('leave_requests',{employee_id:v('hle'),leave_type_id:v('hlt'),from_date:v('hf'),to_date:v('ht'),days:1,reason:v('hlr')}))">طلب إجازة</button></div></div>
+ <div class="card form-card"><div class="row"><select id="he">${O(E)}</select><input id="hd" type="date" value="${new Date().toISOString().slice(0,10)}"><input id="hi" type="datetime-local"><input id="ho" type="datetime-local"><select id="hs"><option>Present</option><option>Late</option><option>Absent</option><option>Leave</option><option>Holiday</option></select><button class="btn" onclick="act(()=>ins('attendance',{employee_id:v('he'),work_date:v('hd'),check_in:v('hi')?new Date(v('hi')).toISOString():null,check_out:v('ho')?new Date(v('ho')).toISOString():null,status:v('hs')}))">تسجيل حضور</button></div><hr><div class="row"><select id="hle">${O(E)}</select><select id="hlt">${O(types)}</select><input id="hf" type="date"><input id="ht" type="date"><input id="hlr" placeholder="السبب"><button class="btn soft" onclick="act(()=>ins('leave_requests',{employee_id:v('hle'),leave_type_id:v('hlt'),from_date:v('hf'),to_date:v('ht'),days:1,reason:v('hlr')}))">طلب إجازة</button></div></div>
  <div class="report-cards"><div class="card form-card"><div class="card-title"><b>مكافأة / جزاء</b><span class="muted">يظهر في سجل الـHR ويُربط بشهر المرتب.</span></div><div class="row"><select id="ae">${O(E)}</select><select id="ak"><option value="reward">مكافأة</option><option value="penalty">جزاء</option></select><input id="aa" type="number" placeholder="المبلغ"><input id="ad" type="date" value="${new Date().toISOString().slice(0,10)}"><input id="am" type="month"><input id="ar" placeholder="السبب"><button class="btn" onclick="act(()=>ins('employee_adjustments',{employee_id:v('ae'),kind:v('ak'),amount:n('aa'),effective_date:v('ad'),payroll_month:v('am')?v('am')+'-01':null,reason:v('ar')}))">إضافة</button></div></div>
  <div class="card form-card"><div class="card-title"><b>العطلات الرسمية</b><span class="muted">تستخدم أيضًا لتحديد حالة Holiday في الحضور.</span></div><div class="row"><input id="hn" placeholder="اسم العطلة"><input id="hdx" type="date"><label><input type="checkbox" id="hp" checked> مدفوعة</label><button class="btn soft" onclick="act(()=>ins('holidays',{name:v('hn'),holiday_date:v('hdx'),paid:$('#hp').checked}))">إضافة عطلة</button></div></div></div>
  <div class="card">${T(['الموظف','من','إلى','الأيام','الحالة','سبب'],L.map(x=>[e(by(E,x.employee_id).name),x.from_date,x.to_date,x.days,chip(x.status,x.status==='Approved'?'success':x.status==='Rejected'?'danger':'warning'),e(x.reason)]))}</div>
@@ -487,7 +489,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.50';
+const APP_VERSION='v1.51';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1245,7 +1247,7 @@ async function hrView(){
   const today=new Date().toISOString().slice(0,10);
   const bar=secBar('hr',[['att','الحضور'],['leave','الإجازات'],['adj','مكافآت وجزاءات'],['hol','العطلات']],'att');
   let body='';
-  if(sec==='att') body=`<div class="card form-card"><div class="card-title"><b>تسجيل حضور</b><span class="muted">اختار الموظف والتاريخ والحالة. أوقات الحضور اختيارية.</span></div><div class="row"><select id="he">${O(E)}</select><input id="hd" type="date" value="${today}"><select id="hs"><option>Present</option><option>Late</option><option>Absent</option><option>Leave</option><option>Holiday</option></select><button class="btn" onclick="act(()=>ins('attendance',{employee_id:v('he'),work_date:v('hd'),check_in:v('hi')||null,check_out:v('ho')||null,status:v('hs')}))">تسجيل</button></div><details class="mt10"><summary>أوقات الحضور والانصراف (اختياري)</summary><div class="row"><input id="hi" type="datetime-local"><input id="ho" type="datetime-local"></div></details></div>`;
+  if(sec==='att') body=`<div class="card form-card"><div class="card-title"><b>تسجيل حضور</b><span class="muted">اختار الموظف والتاريخ والحالة. أوقات الحضور اختيارية.</span></div><div class="row"><select id="he">${O(E)}</select><input id="hd" type="date" value="${today}"><select id="hs"><option>Present</option><option>Late</option><option>Absent</option><option>Leave</option><option>Holiday</option></select><button class="btn" onclick="act(()=>ins('attendance',{employee_id:v('he'),work_date:v('hd'),check_in:v('hi')?new Date(v('hi')).toISOString():null,check_out:v('ho')?new Date(v('ho')).toISOString():null,status:v('hs')}))">تسجيل</button></div><details class="mt10"><summary>أوقات الحضور والانصراف (اختياري)</summary><div class="row"><input id="hi" type="datetime-local"><input id="ho" type="datetime-local"></div></details></div>`;
   else if(sec==='leave') body=`<div class="card form-card"><div class="card-title"><b>طلب إجازة</b></div><div class="row"><select id="hle">${O(E)}</select><select id="hlt">${O(types)}</select><input id="hf" type="date"><input id="ht" type="date"><input id="hlr" placeholder="السبب"><button class="btn soft" onclick="act(()=>ins('leave_requests',{employee_id:v('hle'),leave_type_id:v('hlt'),from_date:v('hf'),to_date:v('ht'),days:dCount(v('hf'),v('ht')),reason:v('hlr')}))">تقديم الطلب</button></div></div><div class="card">${T(['الموظف','من','إلى','الأيام','الحالة','السبب'],L.map(x=>[e(by(E,x.employee_id).name),x.from_date,x.to_date,x.days,chip(x.status,x.status==='Approved'?'success':x.status==='Rejected'?'danger':'warning'),e(x.reason)]))}</div>`;
   else if(sec==='adj') body=`<div class="card form-card"><div class="card-title"><b>مكافأة / جزاء</b><span class="muted">يُربط بشهر المرتب ويدخل في حسابه.</span></div><div class="row"><select id="ae">${O(E)}</select><select id="ak"><option value="reward">مكافأة</option><option value="penalty">جزاء</option></select><input id="aa" type="number" placeholder="المبلغ"><input id="ad" type="date" value="${today}"><input id="am" type="month"><input id="ar" placeholder="السبب"><button class="btn" onclick="act(()=>ins('employee_adjustments',{employee_id:v('ae'),kind:v('ak'),amount:n('aa'),effective_date:v('ad'),payroll_month:v('am')?v('am')+'-01':null,reason:v('ar')}))">إضافة</button></div></div><div class="card">${T(['الموظف','النوع','المبلغ','التاريخ','الشهر','الاعتماد'],Adj.map(x=>[e(by(E,x.employee_id).name),x.kind==='reward'?'مكافأة':'جزاء',money(x.amount),x.effective_date,x.payroll_month?x.payroll_month.slice(0,7):'—',chip(x.approved?'معتمد':'معلّق',x.approved?'success':'warning')]))}</div>`;
   else body=`<div class="card form-card"><div class="card-title"><b>العطلات الرسمية</b><span class="muted">تُستخدم لتحديد حالة Holiday في الحضور.</span></div><div class="row"><input id="hn" placeholder="اسم العطلة"><input id="hdx" type="date"><label><input type="checkbox" id="hp" checked> مدفوعة</label><button class="btn soft" onclick="act(()=>ins('holidays',{name:v('hn'),holiday_date:v('hdx'),paid:$('#hp').checked}))">إضافة عطلة</button></div></div><div class="card">${T(['العطلة','التاريخ','مدفوعة'],Holi.map(x=>[e(x.name),x.holiday_date,x.paid?'نعم':'لا']))}</div>`;
@@ -1596,38 +1598,34 @@ boot=async function(){await _boot0();refreshCo()};
 
 
 // ---------- v1.50: الأطراف الموحدة (عميل ومورد في سجل واحد) ----------
-const PT_TABS=[['all','الكل'],['cust','العملاء'],['supp','الموردون']];
-function ptNet(x){const n0=+x.net||0;if(Math.abs(n0)<0.005)return '<span class="muted">متصفّر</span>';return n0>0?`<span class="good">له علينا ${fmt(n0)}</span>`:`<span class="bad">علينا ليه ${fmt(-n0)}</span>`}
+const PT_TABS=[['all','الكل'],['owe','عليه فلوس لينا'],['owed','لينا فلوس عليه']];
+function ptNet(x){const n0=+x.net||0;if(Math.abs(n0)<0.005)return '<span class="muted">متصفّر</span>';return n0>0?`<span class="good">عليه فلوس لينا ${fmt(n0)}</span>`:`<span class="bad">لينا فلوس عليه ${fmt(-n0)}</span>`}
+// كل طرف عميل ومورد في نفس الوقت: مفيش اختيار دور، ورصيده واحد صافي
 async function partiesView(){
-  const tab=secCur('pt',view==='supp'?'supp':'all');
+  const tab=secCur('pt','all');
   const bar=secBar('pt',PT_TABS,'all');
   const B=await g('party_balances','name');
-  const L=B.filter(x=>tab==='cust'?x.customer_id:tab==='supp'?x.supplier_id:true);
+  const L=B.filter(x=>{const n0=+x.net||0;return tab==='owe'?n0>0.005:tab==='owed'?n0<-0.005:true});
+  const sumR=B.reduce((t,x)=>t+(+x.receivable||0),0), sumP=B.reduce((t,x)=>t+(+x.payable||0),0);
   const rows=L.map(x=>{
-    const roles=[x.customer_id?chip('عميل','info'):'',x.supplier_id?chip('مورد','warning'):''].join(' ');
-    const acts=[];
-    acts.push(`<button class="s" onclick="partyEdit('${x.party_id}')">تعديل</button>`);
-    if(x.customer_id){acts.push(`<button class="s" onclick="partyStmt('${x.customer_id}','c')">كشف العميل</button>`);acts.push(`<button class="s" onclick="partyRole('${x.party_id}','customer',${x.customer_active?'false':'true'})">${x.customer_active?'إيقاف كعميل':'تفعيل كعميل'}</button>`)}
-    else acts.push(`<button class="s" onclick="partyRole('${x.party_id}','customer',true)">إضافة كعميل</button>`);
-    if(x.supplier_id){acts.push(`<button class="s" onclick="partyStmt('${x.supplier_id}','s')">كشف المورد</button>`);acts.push(`<button class="s" onclick="partyRole('${x.party_id}','supplier',${x.supplier_active?'false':'true'})">${x.supplier_active?'إيقاف كمورد':'تفعيل كمورد'}</button>`)}
-    else acts.push(`<button class="s" onclick="partyRole('${x.party_id}','supplier',true)">إضافة كمورد</button>`);
-    acts.push(`<button class="s" onclick="act(()=>rpc('set_party_active',{p_party:'${x.party_id}',p_on:${x.active?'false':'true'}}))">${x.active?'تعطيل الطرف':'تفعيل الطرف'}</button>`);
-    return `<tr data-s="${e((x.name+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase())}"><td><b>${e(x.name)}</b>${x.phone?`<br><small class="muted">${e(x.phone)}</small>`:''}</td><td>${roles}</td><td>${x.customer_id?fmt(x.receivable):'<span class="muted">—</span>'}</td><td>${x.supplier_id?fmt(x.payable):'<span class="muted">—</span>'}</td><td>${ptNet(x)}</td><td>${x.active?chip('مفعّل','success'):chip('موقوف','warning')}</td><td><div class="row-btns">${acts.join(' ')}</div></td></tr>`;
+    const acts=[`<button class="s" onclick="partyEdit('${x.party_id}')">تعديل</button>`];
+    if(x.customer_id)acts.push(`<button class="s" onclick="partyStmt('${x.customer_id}','c')">كشف الحساب</button>`);
+    acts.push(`<button class="s" onclick="act(()=>rpc('set_party_active',{p_party:'${x.party_id}',p_on:${x.active?'false':'true'}}))">${x.active?'تعطيل':'تفعيل'}</button>`);
+    return `<tr data-s="${e((x.name+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase())}"><td><b>${e(x.name)}</b>${x.phone?`<br><small class="muted">${e(x.phone)}</small>`:''}</td><td>${fmt(x.receivable)}</td><td>${fmt(x.payable)}</td><td>${ptNet(x)}</td><td>${x.active?chip('مفعّل','success'):chip('موقوف','warning')}</td><td><div class="row-btns">${acts.join(' ')}</div></td></tr>`;
   }).join('');
   const canNew=me&&['admin','accountant','sales','store'].includes(me.role);
-  const form=canNew?`<div class="card form-card"><div class="card-title"><b>طرف جديد</b><span class="muted">اختار عميل أو مورد أو الاتنين. الطرف بيتسجل مرة واحدة وبرصيد صافي.</span></div>
+  const form=canNew?`<div class="card form-card"><div class="card-title"><b>طرف جديد</b><span class="muted">الطرف بيتسجل عميل ومورد مع بعض، برصيد واحد صافي.</span></div>
     <div class="row"><input id="pn" placeholder="الاسم"><input id="pp" placeholder="الهاتف"><input id="pe" type="email" placeholder="البريد"><input id="pa" placeholder="العنوان"><input id="ptx" placeholder="الرقم الضريبي"></div>
-    <div class="row"><label><input type="checkbox" id="prc" checked> عميل</label><input id="pcl" type="number" placeholder="حد الائتمان"><input id="pct" type="number" placeholder="مدة السداد (عميل) بالأيام"><input id="pco" type="number" placeholder="رصيد افتتاحي (عميل)"></div>
-    <div class="row"><label><input type="checkbox" id="prs"> مورد</label><input id="pst" type="number" placeholder="مدة السداد (مورد) بالأيام"><input id="pso" type="number" placeholder="رصيد افتتاحي (مورد)"><button onclick="partyNew()">إضافة الطرف</button></div></div>`:'';
-  return sectionHead('الأطراف','العملاء والموردين في سجل واحد لكل طرف، برصيد صافي ظاهر.')+form+
-    `<div class="card np">${bar}<input class="inv-search" type="search" placeholder="بحث بالاسم أو الهاتف أو البريد" oninput="invFilter(this.value)" style="margin-top:8px"></div>
-    <div class="card"><div class="table-wrap"><table class="inv-table"><thead><tr><th>الطرف</th><th>الأدوار</th><th>مستحق منه (عميل)</th><th>مستحق له (مورد)</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="7" class="muted">لا توجد أطراف بعد</td></tr>'}</tbody></table></div></div>`;
+    <div class="row"><input id="pcl" type="number" placeholder="حد الائتمان"><input id="pct" type="number" placeholder="مدة السداد بالأيام"><input id="pco" type="number" placeholder="رصيد افتتاحي (+ عليه فلوس لينا / - لينا فلوس عليه)"><button onclick="partyNew()">إضافة الطرف</button></div></div>`:'';
+  return sectionHead('الأطراف','كل طرف عميل ومورد في نفس الوقت، برصيد صافي واحد.')+form+
+    `<div class="party-stats"><div><small>إجمالي عليه فلوس لينا</small><b class="good">${fmt(sumR)}</b></div><div><small>إجمالي لينا فلوس عليه</small><b class="bad">${fmt(sumP)}</b></div><div><small>الصافي</small><b>${fmt(sumR-sumP)}</b></div></div>
+    <div class="card np">${bar}<input class="inv-search" type="search" placeholder="بحث بالاسم أو الهاتف أو البريد" oninput="invFilter(this.value)" style="margin-top:8px"></div>
+    <div class="card"><div class="table-wrap"><table class="inv-table"><thead><tr><th>الطرف</th><th>عليه فلوس لينا</th><th>لينا فلوس عليه</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد أطراف في هذا التبويب</td></tr>'}</tbody></table></div></div>`;
 }
 async function partyNew(){
-  const roles=[];if($('#prc')&&$('#prc').checked)roles.push('customer');if($('#prs')&&$('#prs').checked)roles.push('supplier');
   if(!v('pn').trim())return alert('اكتب اسم الطرف');
-  if(!roles.length)return alert('اختار عميل أو مورد على الأقل');
-  await act(()=>rpc('create_party',{p_name:v('pn').trim(),p_phone:v('pp'),p_email:v('pe'),p_address:v('pa'),p_tax:v('ptx'),p_notes:null,p_roles:roles,p_credit_limit:n('pcl'),p_customer_terms:parseInt(v('pct'))||0,p_customer_opening:n('pco'),p_supplier_terms:parseInt(v('pst'))||0,p_supplier_opening:n('pso')}));
+  const terms=parseInt(v('pct'))||0;
+  await act(()=>rpc('create_party',{p_name:v('pn').trim(),p_phone:v('pp'),p_email:v('pe'),p_address:v('pa'),p_tax:v('ptx'),p_notes:null,p_roles:null,p_credit_limit:n('pcl'),p_customer_terms:terms,p_customer_opening:n('pco'),p_supplier_terms:terms,p_supplier_opening:0}));
 }
 async function partyEdit(id){
   const[P,cu,su]=await Promise.all([
@@ -1648,9 +1646,89 @@ function partyStmt(id,k){window._sk=k==='s'?'s':'c';window._stp=id;go('stmt')}
 // مدخل الأطراف من القائمة (العملاء والموردين) — الموردين بيفتحوا تبويب الموردين
 const _legacy1=legacyHtml;
 legacyHtml=async function(){
-  if(view==='cust'||view==='supp'){if(view==='supp'){window._sec=window._sec||{};window._sec.pt='supp'}return partiesView()}
+  if(view==='cust'||view==='supp'){if(view==='supp'){window._sec=window._sec||{};window._sec.pt='all'}return partiesView()}
   return _legacy1()
 };
+
+// ===== v1.51 =====
+// بطاقة إعدادات الشركة (تصميم منظم: هوية، بيانات، ضريبة ومخزون، خصم)
+function coCardHtml(s){
+  const adm=me.role==='admin';const dis=adm?'':' disabled';
+  const swt=(id,on,lbl,hint)=>`<label class="co-switch"><input type="checkbox" id="${id}" ${on?'checked':''}${dis}><span><b>${lbl}</b>${hint?`<small>${hint}</small>`:''}</span></label>`;
+  return `<div class="card co-card">
+    <div class="co-head">
+      <div class="co-logo">${s.logo_url?'':'<span class="co-logo-empty">'+e((s.company_name||'ش').slice(0,1))+'</span>'}<img id="coLogoPv" src="${e(s.logo_url||'')}" alt="لوجو الشركة" style="${s.logo_url?'':'display:none'}"></div>
+      <div class="co-title"><b>${e(s.company_name||'الشركة')}</b><small class="muted">بيانات الفواتير والضريبة والمخزون</small></div>
+      ${adm?`<label class="btn soft sm">رفع لوجو<input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="uploadCoLogo(this)"></label>`:''}
+    </div>
+    <div class="co-sec"><h4>البيانات الأساسية</h4>
+      <div class="fm-grid">
+        <label class="fm-f"><span>اسم الشركة</span><input id="sc" value="${e(s.company_name)}"${dis}></label>
+        <label class="fm-f"><span>بادئة الفاتورة</span><input id="sp" value="${e(s.invoice_prefix)}"${dis}></label>
+        <label class="fm-f"><span>الرقم الضريبي</span><input id="stn" value="${e(s.tax_number)}"${dis}></label>
+      </div></div>
+    <div class="co-sec"><h4>الضريبة والمخزون</h4>
+      <div class="co-switches">${swt('ste',s.tax_enabled,'تفعيل الضريبة')}${swt('sn',s.negative_stock,'السماح بالمخزون السالب')}</div>
+      <div class="fm-grid"><label class="fm-f"><span>نسبة الضريبة %</span><input id="sx" type="number" value="${s.tax_pct}"${dis}></label></div></div>
+    <div class="co-sec"><h4>حد الخصم</h4>
+      <div class="fm-grid"><label class="fm-f"><span>أقصى خصم على الفاتورة %</span><input id="sdm" type="number" step="0.01" min="0" max="100" value="${s.sales_discount_max_pct??5}"${dis}></label></div>
+      <small class="muted">بيتطبق على دور المبيعات كنسبة من إجمالي الأصناف. الأدمن والمحاسب مالهمش حد.</small></div>
+    <div class="co-foot"><small class="muted">اللوجو بيظهر في الفواتير والمرتجعات والطباعة. PNG أو JPG أو WebP أقل من 512 كيلو.</small>
+      ${adm?`<button onclick="saveCoSettings()">حفظ الإعدادات</button>`:''}</div>
+  </div>`;
+}
+function saveCoSettings(){return act(()=>upd('company_settings',1,{company_name:v('sc'),invoice_prefix:v('sp'),tax_number:v('stn'),negative_stock:$('#sn').checked,tax_enabled:$('#ste').checked,tax_pct:n('sx'),sales_discount_max_pct:n('sdm')}))}
+
+// ----- تحديث التطبيق لكل المستخدمين -----
+const APP_SEEN_KEY='erp_refresh_seen';
+async function pushAppUpdate(){
+  if(!confirm('نبعت تحديث لكل المستخدمين؟ أي حد فاتح النظام هيتحدث أوتوماتيك.'))return;
+  try{
+    const t=await rpc('dev_push_refresh',{});
+    try{localStorage.setItem(APP_SEEN_KEY,String(t))}catch{}
+    alert('تم إرسال التحديث. المستخدمين هيتحدثوا خلال دقيقة تقريباً (أول ما يفتحوا أو يرجعوا للصفحة).');
+  }catch(x){alert('تعذر إرسال التحديث: '+(x.message||x))}
+}
+async function forceAppReload(t){
+  try{localStorage.setItem(APP_SEEN_KEY,String(t))}catch{}
+  try{
+    if('serviceWorker' in navigator){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}
+    if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
+  }catch{}
+  location.reload();
+}
+async function checkAppRefresh(){
+  try{
+    const t=String(await rpc('app_refresh_token',{})||'');
+    if(!t)return;
+    let seen=null;try{seen=localStorage.getItem(APP_SEEN_KEY)}catch{}
+    if(seen===null){try{localStorage.setItem(APP_SEEN_KEY,t)}catch{}return}
+    if(seen!==t){
+      if(document.getElementById('modalBg'))return; // ما نقفلش نافذة مفتوحة، نحاول تاني بعدين
+      await forceAppReload(t);
+    }
+  }catch{}
+}
+setTimeout(checkAppRefresh,4000);
+setInterval(checkAppRefresh,120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkAppRefresh()});
+
+// ----- الحضور الذاتي: الموظف يسجل حضوره وانصرافه بنفسه -----
+async function attSelfHtml(){
+  if(!me)return '';
+  const{data:emp}=await sb.from('employees').select('id,name').eq('user_id',me.id).maybeSingle();
+  if(!emp)return '';
+  const today=cday(new Date());
+  const{data:rec}=await sb.from('attendance').select('*').eq('employee_id',emp.id).eq('work_date',today).maybeSingle();
+  const tm=t=>t?new Date(t).toLocaleTimeString('ar-EG',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit'}):'—';
+  const canIn=!rec||!rec.check_in, canOut=!!(rec&&rec.check_in&&!rec.check_out);
+  return `<div class="card att-self"><div class="card-title"><b>حضوري النهارده: ${e(emp.name)}</b><span class="muted">${today}</span></div>
+    <div class="att-self-row"><div><small class="muted">الحضور</small><b>${tm(rec?.check_in)}</b></div><div><small class="muted">الانصراف</small><b>${tm(rec?.check_out)}</b></div>
+    <button ${canIn?'':'disabled'} onclick="attSelf('in')">تسجيل حضور</button><button class="soft" ${canOut?'':'disabled'} onclick="attSelf('out')">تسجيل انصراف</button></div></div>`;
+}
+function attSelf(a){return act(()=>rpc('attendance_check',{p_action:a}))}
+const _hrBaseV151=hrView;
+hrView=async function(){const h=await _hrBaseV151();let s='';try{s=await attSelfHtml()}catch{}return s+h};
 
 </script>
 </body></html>
