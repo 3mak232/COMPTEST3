@@ -262,6 +262,7 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.role==='admin'?settingsLink('int','التكاملات','إدارة الاتصالات والتكاملات الخارجية.','↔'):''}
   ${me.role==='admin'?settingsLink('audit','سجل العمليات','مراجعة العمليات والتغييرات.','⌁'):''}
   ${me.isDev?settingsLink('health','فحص الجاهزية','فحوصات الصحة وGo-Live.','♥'):''}
+  <button class="settings-tile" onclick="toggleDialect()"><span class="settings-icon">ع</span><span><b>أسلوب الكلام: ${dialectMode()==='msa'?'فصحى':'عامية مصرية'}</b><small>اضغط عشان تبدّل بين العامية المصرية والفصحى (التبديل ده على الجهاز ده).</small></span><span class="settings-arrow">‹</span></button>
   ${me.isDev?'<button class="settings-tile" onclick="pushAppUpdate()"><span class="settings-icon">⟳</span><span><b>تحديث لكل المستخدمين</b><small>يخلي كل المستخدمين يحملوا أحدث نسخة أوتوماتيك من غير Ctrl+F5.</small></span><span class="settings-arrow">‹</span></button>':''}
 </div>
 ${coCardHtml(s)}
@@ -487,7 +488,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.53';
+const APP_VERSION='v1.55';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1574,7 +1575,7 @@ async function uploadCoLogo(input){
   await act(async()=>{
     const ext=f.type==='image/png'?'png':f.type==='image/webp'?'webp':'jpg';
     const path='logo-'+Date.now()+'.'+ext;
-    const up=await sb.storage.from('company-assets').upload(path,f,{contentType:f.type,upsert:true});
+    const up=await sb.storage.from('company-assets').upload(path,f,{contentType:f.type,upsert:false});
     if(up.error)throw up.error;
     const url=sb.storage.from('company-assets').getPublicUrl(path).data.publicUrl;
     await upd('company_settings',1,{logo_url:url});
@@ -1606,8 +1607,8 @@ boot=async function(){await _boot0();refreshCo()};
 
 
 // ---------- v1.50: الأطراف الموحدة (عميل ومورد في سجل واحد) ----------
-const PT_TABS=[['all','الكل'],['owe','عليه فلوس لينا'],['owed','لينا فلوس عليه']];
-function ptNet(x){const n0=+x.net||0;if(Math.abs(n0)<0.005)return '<span class="muted">متصفّر</span>';return n0>0?`<span class="good">عليه فلوس لينا ${fmt(n0)}</span>`:`<span class="bad">لينا فلوس عليه ${fmt(-n0)}</span>`}
+const PT_TABS=[['all','الكل'],['owe','عليه فلوس لينا'],['owed','علينا فلوس ليه']];
+function ptNet(x){const n0=+x.net||0;if(Math.abs(n0)<0.005)return '<span class="muted">متصفّر</span>';return n0>0?`<span class="good">عليه فلوس لينا ${fmt(n0)}</span>`:`<span class="bad">علينا فلوس ليه ${fmt(-n0)}</span>`}
 // كل طرف عميل ومورد في نفس الوقت: مفيش اختيار دور، ورصيده واحد صافي
 async function partiesView(){
   const tab=secCur('pt','all');
@@ -1624,11 +1625,11 @@ async function partiesView(){
   const canNew=me&&['admin','accountant','sales','store'].includes(me.role);
   const form=canNew?`<div class="card form-card"><div class="card-title"><b>طرف جديد</b><span class="muted">الطرف بيتسجل عميل ومورد مع بعض، برصيد واحد صافي.</span></div>
     <div class="row"><input id="pn" placeholder="الاسم"><input id="pp" placeholder="الهاتف"><input id="pe" type="email" placeholder="البريد"><input id="pa" placeholder="العنوان"><input id="ptx" placeholder="الرقم الضريبي"></div>
-    <div class="row"><input id="pcl" type="number" placeholder="حد الائتمان"><input id="pct" type="number" placeholder="مدة السداد بالأيام"><input id="pco" type="number" placeholder="رصيد افتتاحي (+ عليه فلوس لينا / - لينا فلوس عليه)"><button onclick="partyNew()">إضافة الطرف</button></div></div>`:'';
+    <div class="row"><input id="pcl" type="number" placeholder="حد الائتمان"><input id="pct" type="number" placeholder="مدة السداد بالأيام"><input id="pco" type="number" placeholder="رصيد افتتاحي (+ عليه فلوس لينا / - علينا فلوس ليه)"><button onclick="partyNew()">إضافة الطرف</button></div></div>`:'';
   return sectionHead('الأطراف','كل طرف عميل ومورد في نفس الوقت، برصيد صافي واحد.')+form+
-    `<div class="party-stats"><div><small>إجمالي عليه فلوس لينا</small><b class="good">${fmt(sumR)}</b></div><div><small>إجمالي لينا فلوس عليه</small><b class="bad">${fmt(sumP)}</b></div><div><small>الصافي</small><b>${fmt(sumR-sumP)}</b></div></div>
+    `<div class="party-stats"><div><small>إجمالي عليه فلوس لينا</small><b class="good">${fmt(sumR)}</b></div><div><small>إجمالي علينا فلوس ليه</small><b class="bad">${fmt(sumP)}</b></div><div><small>الصافي</small><b>${fmt(sumR-sumP)}</b></div></div>
     <div class="card np">${bar}<input class="inv-search" type="search" placeholder="بحث بالاسم أو الهاتف أو البريد" oninput="invFilter(this.value)" style="margin-top:8px"></div>
-    <div class="card"><div class="table-wrap"><table class="inv-table"><thead><tr><th>الطرف</th><th>عليه فلوس لينا</th><th>لينا فلوس عليه</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد أطراف في هذا التبويب</td></tr>'}</tbody></table></div></div>`;
+    <div class="card"><div class="table-wrap"><table class="inv-table"><thead><tr><th>الطرف</th><th>عليه فلوس لينا</th><th>علينا فلوس ليه</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد أطراف في هذا التبويب</td></tr>'}</tbody></table></div></div>`;
 }
 async function partyNew(){
   if(!v('pn').trim())return alert('اكتب اسم الطرف');
@@ -1773,7 +1774,7 @@ async function showPartyStmt(){
     B.supplier_id?sb.from('suppliers').select('opening_balance').eq('id',B.supplier_id).single().then(r=>r.data||{}):{},
     B.customer_id?rpc('customer_statement',{p_party:B.customer_id,p_to:b}):[],
     B.supplier_id?rpc('supplier_statement',{p_party:B.supplier_id,p_to:b}):[]]);
-  // أثر كل حركة على الصافي: عميل (مدين = عليه فلوس لينا)، مورد (دائن = لينا فلوس عليه)
+  // أثر كل حركة على الصافي: عميل (مدين = عليه فلوس لينا)، مورد (دائن = علينا فلوس ليه)
   const rowsAll=[
     ...cr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'عميل',eff:(+r.debit||0)-(+r.credit||0)})),
     ...sr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'مورد',eff:(+r.debit||0)-(+r.credit||0)}))
@@ -1782,7 +1783,7 @@ async function showPartyStmt(){
   const before=rowsAll.filter(r=>r.d<a).reduce((t,r)=>t+r.eff,0);
   let bal=open+before;
   const startBal=bal;
-  const balTxt=x=>Math.abs(x)<0.005?'<span class="muted">متصفّر</span>':x>0?`<span class="good">عليه فلوس لينا ${fmt(x)}</span>`:`<span class="bad">لينا فلوس عليه ${fmt(-x)}</span>`;
+  const balTxt=x=>Math.abs(x)<0.005?'<span class="muted">متصفّر</span>':x>0?`<span class="good">عليه فلوس لينا ${fmt(x)}</span>`:`<span class="bad">علينا فلوس ليه ${fmt(-x)}</span>`;
   const body=rowsAll.filter(r=>r.d>=a).map(r=>{
     bal+=r.eff;
     const owe=r.eff>0?fmt(r.eff):'', owed=r.eff<0?fmt(-r.eff):'';
@@ -1790,10 +1791,49 @@ async function showPartyStmt(){
   });
   st=`<div class="stmt-head"><div><h3>${e(B.name||'')}</h3>${B.phone?`<small class="muted">${e(B.phone)}</small>`:''}</div>
       <div class="stmt-open">رصيد أول المدة: ${balTxt(startBal)}</div></div>`
-    +T(['التاريخ','المستند','البيان','النوع','عليه فلوس لينا','لينا فلوس عليه','الرصيد'],body)
+    +T(['التاريخ','المستند','البيان','النوع','عليه فلوس لينا','علينا فلوس ليه','الرصيد'],body)
     +`<p class="stmt-close">الرصيد الختامي: ${balTxt(bal)}</p>`;
   R();
 }
 function partyStmt(id){window._stp=id;st='';go('stmt')}
+// ===== v1.55: تبديل الأسلوب (عامية / فصحى) =====
+// النصوص الحالية هي الأساس (عامية)، والفصحى بتتطبق كتبديل على النصوص المعروفة في الواجهة.
+const DIALECT_MSA={
+  'عليه فلوس لينا':'مدين لنا','علينا فلوس ليه':'دائن لنا','متصفّر':'متوازن',
+  'لا توجد أطراف في هذا التبويب':'لا توجد أطراف في هذا التصنيف','لا توجد أطراف بعد':'لا توجد أطراف بعد',
+  'مفيش نتيجة':'لا توجد نتائج','اعرض الكشف':'اعرض الكشف','عرض الكشف':'عرض الكشف',
+  'ابحث عن الطرف':'ابحث عن الطرف','اكتب الاسم أو رقم الهاتف':'اكتب الاسم أو رقم الهاتف',
+  'اختار طرف':'اختر طرفاً','ابحث واختار الطرف':'ابحث واختر الطرف','اختار الطرف':'اختر الطرف',
+  'اختار':'اختر','تسجيل حضور':'تسجيل الحضور','تسجيل انصراف':'تسجيل الانصراف',
+  'حضوري النهارده':'حضوري اليوم','النهارده':'اليوم','اتعمل':'أُنشئ','اتحدّث':'حُدّث',
+  'اعرض الكشف الأول':'اعرض الكشف أولاً','اسمح بالنوافذ المنبثقة':'اسمح بالنوافذ المنبثقة'
+};
+function dialectMode(){try{return localStorage.getItem('erp_dialect')||'eg'}catch{return 'eg'}}
+function applyDialect(root){
+  if(!root)return;
+  const msa=dialectMode()==='msa';
+  const keys=Object.keys(DIALECT_MSA).sort((a,b)=>b.length-a.length);
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  const nodes=[];let n;while((n=w.nextNode()))nodes.push(n);
+  for(const t of nodes){
+    if(t.__orig===undefined)t.__orig=t.nodeValue;
+    let out=t.__orig;
+    if(msa)for(const k of keys){if(out.includes(k))out=out.split(k).join(DIALECT_MSA[k])}
+    if(t.nodeValue!==out)t.nodeValue=out;
+  }
+}
+function toggleDialect(){
+  const next=dialectMode()==='msa'?'eg':'msa';
+  try{localStorage.setItem('erp_dialect',next)}catch{}
+  applyDialect(document.getElementById('app'));
+  if(typeof R==='function')R('soft');
+}
+(function(){
+  const app=document.getElementById('app');
+  if(!app)return;
+  let queued=false;
+  new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;applyDialect(app)})}).observe(app,{childList:true,subtree:true});
+})();
+
 </script>
 </body></html>
