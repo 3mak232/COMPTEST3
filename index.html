@@ -265,6 +265,7 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.isDev?settingsLink('health','فحص الجاهزية','فحوصات الصحة وGo-Live.','♥'):''}
   <button class="settings-tile" onclick="toggleDialect()"><span class="settings-icon">ع</span><span><b>أسلوب الكلام: ${dialectMode()==='msa'?'فصحى':'عامية مصرية'}</b><small>اضغط عشان تبدّل بين العامية المصرية والفصحى (التبديل ده على الجهاز ده).</small></span><span class="settings-arrow">‹</span></button>
   ${me.isDev?'<button class="settings-tile" onclick="pushAppUpdate()"><span class="settings-icon">⟳</span><span><b>تحديث لكل المستخدمين</b><small>يخلي كل المستخدمين يحملوا أحدث نسخة أوتوماتيك من غير Ctrl+F5.</small></span><span class="settings-arrow">‹</span></button>':''}
+${me.isDev?'<button class="settings-tile" onclick="devToggleLock()"><span class="settings-icon">🔒</span><span><b>قفل / فتح الموقع</b><small>لما يتقفل، أي مستخدم غير المطور يشوف رسالة الصيانة ومايقدرش يشتغل، والداتا بتتقفل على السيرفر.</small></span><span class="settings-arrow">‹</span></button><button class="settings-tile" onclick="devRevokeAll()"><span class="settings-icon">⎋</span><span><b>تسجيل خروج لكل المستخدمين</b><small>يقفل كل الجلسات الحالية، ولازم كل حد يسجل دخول تاني (وحسابك كمان).</small></span><span class="settings-arrow">‹</span></button>':''}
 </div>
 ${coCardHtml(s)}
 ${printCardHtml(s)}
@@ -490,7 +491,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.59';
+const APP_VERSION='v1.61';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -513,7 +514,68 @@ function _loginScreen(){$('#app').innerHTML=`<div class="login-page"><section cl
 function _inactiveScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>الحساب بانتظار التفعيل</h2><p class="login-sub">سيتطلب الحساب تفعيل المدير قبل استخدام النظام.</p><button class="btn" style="width:100%;min-height:48px" onclick="logout()">خروج</button></section></div>`}
 async function login(){return withLoading(async()=>{const{error}=await sb.auth.signInWithPassword({email:v('lu'),password:v('lp')});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
 async function logout(){return withLoading(async()=>{await sb.auth.signOut();me=null;localStorage.removeItem('erp_v_view');view='dash';await R()},'جاري تسجيل الخروج...','جارٍ إنهاء الجلسة بأمان')}
-async function boot(){const{data:{user}}=await sb.auth.getUser();me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
+
+// ----- قفل الموقع + خروج كل الجلسات (v1.61) -----
+const SESS_SEEN_KEY='erp_sess_seen';
+function showLockScreen(msg){
+  let d=document.getElementById('lockScreen');
+  if(!d){d=document.createElement('div');d.id='lockScreen';d.style.cssText='position:fixed;inset:0;z-index:99999;background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font-size:17px;';document.body.appendChild(d)}
+  d.innerHTML='<div style="font-size:44px">🔒</div><div style="font-weight:700;font-size:20px">الموقع مقفول مؤقتاً</div><div style="opacity:.85;max-width:420px;line-height:1.7">'+e(msg||'')+'</div><button id="lockOut" style="margin-top:8px;padding:10px 22px;border-radius:10px;border:0;cursor:pointer;font-size:16px">تسجيل خروج</button>';
+  document.getElementById('lockOut').onclick=async()=>{try{await sb.auth.signOut()}catch{}location.reload()};
+}
+function hideLockScreen(){document.getElementById('lockScreen')?.remove()}
+async function lockGate(loggedIn){
+  let st=null;try{st=await rpc('app_lock_state',{})}catch{}
+  if(!st)return false;
+  if(st.locked&&loggedIn&&!st.is_dev){showLockScreen(st.msg);return true}
+  hideLockScreen();return false;
+}
+async function checkAppLock(){
+  try{
+    const{data:{user}}=await sb.auth.getUser();
+    const st=await rpc('app_lock_state',{});
+    let seen=null;try{seen=localStorage.getItem(SESS_SEEN_KEY)}catch{}
+    if(seen===null){try{localStorage.setItem(SESS_SEEN_KEY,String(st.epoch))}catch{};}
+    else if(String(st.epoch)!==seen){
+      try{localStorage.setItem(SESS_SEEN_KEY,String(st.epoch))}catch{}
+      try{await sb.auth.signOut()}catch{}
+      location.reload();return;
+    }
+    if(user&&st.locked&&!st.is_dev){showLockScreen(st.msg)}
+    else if(document.getElementById('lockScreen')){location.reload()}
+  }catch{}
+}
+setTimeout(checkAppLock,6000);
+setInterval(checkAppLock,120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkAppLock()});
+async function devToggleLock(){
+  try{
+    const st=await rpc('app_lock_state',{});
+    if(st.locked){
+      if(!confirm('نفتح الموقع لكل المستخدمين؟'))return;
+      await rpc('dev_set_lock',{p_locked:false,p_msg:''});
+      alert('الموقع اتفتح.');
+    }else{
+      const m=prompt('رسالة الصيانة اللي هتظهر للمستخدمين:','الموقع تحت الصيانة، جرّب بعد شوية.');
+      if(m===null)return;
+      if(!confirm('نقفل الموقع؟ كل المستخدمين غير المطور هيتقفلوا فوراً.'))return;
+      await rpc('dev_set_lock',{p_locked:true,p_msg:m});
+      alert('الموقع اتقفل.');
+    }
+    await R();
+  }catch(x){alert('تعذر: '+(x.message||x))}
+}
+async function devRevokeAll(){
+  if(!confirm('نسجّل خروج كل المستخدمين؟ حسابك كمان هيتقفل ولازم تسجل دخول تاني.'))return;
+  try{
+    await rpc('dev_revoke_all_sessions',{});
+    try{localStorage.removeItem(SESS_SEEN_KEY)}catch{}
+    try{await sb.auth.signOut()}catch{}
+    location.reload();
+  }catch(x){alert('تعذر: '+(x.message||x))}
+}
+async function boot(){const{data:{user}}=await sb.auth.getUser();
+  if(await lockGate(!!user))return;me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMobileNav()});
 window.addEventListener('pageshow',()=>{ hideLoader(); });
 window.addEventListener('unhandledrejection',()=>{ if(_loading) hideLoader(); });
