@@ -242,7 +242,7 @@ async function loadPayrollAdjustments(){
 }
 function payslipRows(x,E){return [['الموظف',e(by(E,x.employee_id).name||'')],['الشهر',x.month.slice(0,7)],['الأساسي',fmt(x.basic)],['إضافي',fmt(x.overtime)],['مكافآت',fmt(x.bonus)],['سلف',fmt(x.advances)],['خصومات',fmt(x.deductions)],['غياب',fmt(x.absence_deductions)],['الصافي',fmt(x.net)],['الحالة',x.paid?'مدفوع':'غير مدفوع']]}
 function payShow(id){window._pv=id;R()}
-async function payPrint(id){const[E,L]=await Promise.all([g('employees','name'),g('payroll','month')]);const x=L.find(r=>r.id===id);if(!x)return toast('لم يتم العثور على الكشف');const w=window.open('','_blank');if(!w)return alert('اسمح بالنوافذ المنبثقة لطباعة الكشف');w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف مرتب</title><style>body{font-family:Tahoma,Arial;padding:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:right}th{background:#f1f5f9;width:30%}h2{margin:0 0 12px}</style></head><body><h2>كشف مرتب</h2><table><tbody>${payslipRows(x,E).map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}
+async function payPrint(id){const[E,L]=await Promise.all([g('employees','name'),g('payroll','month')]);const x=L.find(r=>r.id===id);if(!x)return toast('لم يتم العثور على الكشف');printHtml('كشف مرتب',`<h2>كشف مرتب</h2><table style="width:100%;border-collapse:collapse"><tbody>${payslipRows(x,E).map(r=>`<tr><th style="background:#eef4ff;text-align:right;width:30%;padding:7px;border:1px solid #eaecf0">${r[0]}</th><td style="padding:7px;border:1px solid #eaecf0">${r[1]}</td></tr>`).join('')}</tbody></table>`)}
 async function payrollView(){const E=await g('employees','name'),L=await g('payroll','month');const pvr=window._pv?L.find(x=>x.id===window._pv):null,pvHtml=pvr?`<div class="card"><div class="card-title"><b>تفاصيل الكشف</b><div><button class="s" onclick="payPrint('${pvr.id}')">طباعة</button> <button class="s" onclick="window._pv=null;R()">إغلاق</button></div></div>${T(['البند','القيمة'],payslipRows(pvr,E))}</div>`:'';return `<h2>المرتبات</h2><div class="card np"><div class="row"><select id="pe" onchange="loadPayrollAdjustments()">${O(E)}</select><input id="pmo" type="month" onchange="loadPayrollAdjustments()"><input id="pb2" type="number" placeholder="الأساسي"><input id="po" type="number" placeholder="إضافي"><input id="pbn" type="number" placeholder="مكافأة"><input id="pa" type="number" placeholder="سلف"><input id="pd" type="number" placeholder="خصومات"><input id="pab" type="number" placeholder="غياب"><select id="pac">${O(C.accts)}</select><button class="btn soft" onclick="loadPayrollAdjustments()" title="يعيد جلب المكافآت والجزاءات والسلف المعتمدة لهذا الموظف في هذا الشهر">جلب المعتمد للشهر</button><button onclick="act(async()=>{if(!v('pmo'))throw Error('اختر الشهر');await ins('payroll',{employee_id:v('pe'),month:v('pmo')+'-01',basic:n('pb2')||+(by(E,v('pe')).salary),overtime:n('po'),bonus:n('pbn'),advances:n('pa'),deductions:n('pd'),absence_deductions:n('pab')})})">إنشاء كشف</button></div><p class="muted">اختر الموظف والشهر وستُحمَّل المكافآت والجزاءات المعتمدة تلقائيًا، ويمكن تعديل القيم قبل إنشاء الكشف. زر «جلب المعتمد للشهر» لإعادة التحميل فقط. الكشوف المنشأة تظهر في الجدول بالأسفل، ومن عمود الإجراءات: عرض، طباعة، دفع.</p></div>${pvHtml}<div class="card">${T(['الموظف','الشهر','الأساسي','الصافي','الحالة',''],L.reverse().map(x=>[e(by(E,x.employee_id).name),x.month.slice(0,7),fmt(x.basic),fmt(x.net),x.paid?'مدفوع':'غير مدفوع',`<button class="s" onclick="payShow('${x.id}')">عرض</button> <button class="s" onclick="payPrint('${x.id}')">طباعة</button> ${x.paid?'':`<button onclick="act(()=>rpc('pay_payroll',{p_payroll:'${x.id}',p_account:v('pac')}))">دفع</button>`}`]))}</div>`}
 async function retView(){const SI=await g('sales_invoices','date'),PI=await g('purchase_invoices','date'),sel=window._rk!=='p',L=sel?SI:PI;return `<h2>المرتجعات</h2><div class="card np"><select id="rk" onchange="window._rk=v('rk');RT=null;R()"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select><select id="ri">${L.map(x=>`<option value="${x.id}">${e(x.number)} — ${fmt(x.total)}</option>`).join('')}</select><button class="s" onclick="loadRet()">عرض البنود</button>${RT?T(['المنتج','الكمية','كمية المرتجع'],RT.items.map((x,i)=>[e(by(C.products,x.product_id).name),x.qty,`<input id="rq${i}" type="number" step="0.001" value="0" style="width:90px">`]))+`<button onclick="act(async()=>{const items=${JSON.stringify(RT.items).replace(/</g,'\\u003c')}.map((x,i)=>({product_id:x.product_id,qty:n('rq'+i)})).filter(x=>x.qty>0);await rpc('${RT.s?'create_sales_return':'create_purchase_return'}',{p_invoice:'${RT.id}',p_items:items});RT=null})">حفظ المرتجع</button>`:''}</div>`}
 async function loadRet(){const s=v('rk')==='s',id=v('ri');const{data,error}=await sb.from(s?'sales_invoice_items':'purchase_invoice_items').select('product_id,qty').eq('invoice_id',id);if(error)throw error;RT={s,id,items:data||[]};R()}
@@ -475,6 +475,7 @@ async function paintView(q){
     else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
     if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
+    if(view!=='dash'){const back=(window._nav&&window._nav.length)?'<button class="btn s" onclick="goBack()">↩ رجوع</button>':'';h=`<div class="no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">${back}<button class="btn s" onclick="go('dash')">🏠 الرئيسية</button></div>`+h}
   }catch(x){h=`<div class="card error-card"><b>تعذر تحميل الصفحة</b><p>${e(x.message||x)}</p></div>`}
   const links=renderNavGroups();
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
@@ -486,7 +487,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.52';
+const APP_VERSION='v1.53';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1577,17 +1578,28 @@ async function uploadCoLogo(input){
     if(up.error)throw up.error;
     const url=sb.storage.from('company-assets').getPublicUrl(path).data.publicUrl;
     await upd('company_settings',1,{logo_url:url});
-    window._coLogo=url;
+    window._coLogo=url;if(window._co)window._co.logo_url=url;
   });
 }
 async function refreshCo(){
-  try{const r=await g('company_settings');window._coLogo=(r[0]&&r[0].logo_url)||'';window._coName=(r[0]&&r[0].company_name)||''}catch(_){}
+  try{const r=await g('company_settings');window._co=r[0]||{};window._coLogo=window._co.logo_url||'';window._coName=window._co.company_name||''}catch(_){}
 }
-// كل الطباعة بتاخد اللوجو تلقائياً لو مفيش لوجو في المحتوى نفسه
+// إعدادات الطباعة (التخصيص الجاي هيكون من الإعدادات): إظهار اللوجو والاسم والعنوان، حجم اللوجو، لون الخط الفاصل
+const PRINT_CFG={showLogo:true,showName:true,showAddress:true,logoMaxH:60,accent:'#1d4ed8'};
+// هيدر الطباعة الموحد: اللوجو + اسم الشركة + العنوان والرقم الضريبي
+function brandHtml(){
+  const c=window._co||{},cfg=PRINT_CFG;
+  const logo=cfg.showLogo&&c.logo_url?`<img src="${e(c.logo_url)}" alt="" style="max-height:${cfg.logoMaxH}px;max-width:220px;display:block">`:'';
+  const name=cfg.showName&&c.company_name?`<b style="font-size:17px;color:#101828">${e(c.company_name)}</b>`:'';
+  const addr=cfg.showAddress?[c.address?e(c.address):'',c.tax_number?'الرقم الضريبي: '+e(c.tax_number):''].filter(Boolean).join(' · '):'';
+  if(!logo&&!name)return '';
+  return `<div class="print-brand" style="display:flex;align-items:center;gap:12px;border-bottom:2px solid ${cfg.accent};padding-bottom:10px;margin-bottom:14px">${logo}<div>${name}${addr?`<div style="color:#667085;font-size:12px;margin-top:2px">${addr}</div>`:''}</div></div>`;
+}
+// كل الطباعة بتاخد الهيدر تلقائياً (opts.brand=false لو التصميم فيه هيدره الخاص)
 const _printHtml0=printHtml;
-printHtml=function(title,body){
-  const logo=window._coLogo&&!/<img/i.test(body)?`<div style="margin-bottom:8px"><img src="${e(window._coLogo)}" alt="" style="max-height:60px"></div>`:'';
-  return _printHtml0(title,logo+body);
+printHtml=function(title,body,opts){
+  const head=(opts&&opts.brand===false)?'':brandHtml();
+  return _printHtml0(title,head+body);
 };
 const _boot0=boot;
 boot=async function(){await _boot0();refreshCo()};
@@ -1672,7 +1684,7 @@ function coCardHtml(s){
       ${adm?`<button onclick="saveCoSettings()">حفظ الإعدادات</button>`:''}</div>
   </div>`;
 }
-function saveCoSettings(){return act(()=>upd('company_settings',1,{company_name:v('sc'),invoice_prefix:v('sp'),tax_number:v('stn'),negative_stock:$('#sn').checked,tax_enabled:$('#ste').checked,tax_pct:n('sx'),sales_discount_max_pct:n('sdm')}))}
+function saveCoSettings(){return act(async()=>{await upd('company_settings',1,{company_name:v('sc'),invoice_prefix:v('sp'),tax_number:v('stn'),negative_stock:$('#sn').checked,tax_enabled:$('#ste').checked,tax_pct:n('sx'),sales_discount_max_pct:n('sdm')});await refreshCo()})}
 
 // ----- تحديث التطبيق لكل المستخدمين -----
 const APP_SEEN_KEY='erp_refresh_seen';
@@ -1726,19 +1738,33 @@ const _hrBaseV151=hrView;
 hrView=async function(){const h=await _hrBaseV151();let s='';try{s=await attSelfHtml()}catch{}return s+h};
 
 // كشف حساب الطرف الواحد: عميل ومورد في كشف واحد، برصيد صافي
+// كشف الحساب: بحث عن الطرف (عميل ومورد في كشف واحد)
 async function stmtView(){
   const P=await g('party_balances','name');
-  const cur=window._stp||'';
+  window._PL=P;
+  const cur=P.find(x=>x.party_id===window._stp)||null;
   return `<h2>كشف الحساب</h2><div class="card np stmt-bar">
-    <label class="fm-f"><span>الطرف</span><select id="sp" onchange="window._stp=this.value;st='';R()"><option value="">— اختار طرف —</option>${P.map(x=>`<option value="${x.party_id}" ${x.party_id===cur?'selected':''}>${e(x.name)}</option>`).join('')}</select></label>
-    <label class="fm-f"><span>من</span><input type="date" id="sa" value="${e(window._sa||'')}"></label>
-    <label class="fm-f"><span>إلى</span><input type="date" id="sb2" value="${e(window._sb||'')}"></label>
-    <div class="stmt-btns"><button onclick="showPartyStmt()">عرض الكشف</button><button class="s" onclick="window.print()">طباعة / PDF</button></div>
-  </div><div class="card">${st||'اختار الطرف والفترة واضغط عرض الكشف'}</div>`;
+    <div class="fm-f stmt-search"><span>ابحث عن الطرف</span><input id="sq3" type="search" placeholder="اكتب الاسم أو رقم الهاتف" autocomplete="off" value="${cur?e(cur.name):''}" oninput="ptStSearch(this.value)"><div id="stRes3" class="stmt-res"></div></div>
+    <label class="fm-f"><span>من تاريخ</span><input type="date" id="sa" value="${e(window._sa||'')}"></label>
+    <label class="fm-f"><span>إلى تاريخ</span><input type="date" id="sb2" value="${e(window._sb||'')}"></label>
+    <div class="stmt-btns"><button onclick="showPartyStmt()">عرض الكشف</button><button class="s" onclick="printStmt()">طباعة / PDF</button></div>
+  </div><div class="card stmt-out">${st||'ابحث واختار الطرف، وحدد الفترة (اختياري)، واضغط عرض الكشف'}</div>`;
+}
+function ptStSearch(q){
+  const box=document.getElementById('stRes3');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){box.innerHTML='';return}
+  const L=(window._PL||[]).filter(x=>(x.name+' '+(x.phone||'')).toLowerCase().includes(q)).slice(0,8);
+  box.innerHTML=L.map(x=>`<button type="button" class="stmt-opt" onclick="pickParty('${x.party_id}')"><b>${e(x.name)}</b>${x.phone?` <small class="muted">${e(x.phone)}</small>`:''}</button>`).join('')||'<div class="muted">مفيش نتيجة</div>';
+}
+function pickParty(id){window._stp=id;st='';R()}
+function printStmt(){
+  if(!window._stp||!st)return toast('اعرض الكشف الأول');
+  printHtml('كشف الحساب',st);
 }
 async function showPartyStmt(){
-  const id=v('sp')||window._stp;
-  if(!id)return alert('اختار الطرف أولاً');
+  const id=window._stp;
+  if(!id)return alert('ابحث واختار الطرف أولاً');
   window._stp=id; window._sa=v('sa'); window._sb=v('sb2');
   const a=v('sa')||'0000-01-01', b=v('sb2')||'9999-12-31';
   const B=(await g('party_balances','name')).find(x=>x.party_id===id)||{};
@@ -1750,7 +1776,7 @@ async function showPartyStmt(){
   // أثر كل حركة على الصافي: عميل (مدين = عليه فلوس لينا)، مورد (دائن = لينا فلوس عليه)
   const rowsAll=[
     ...cr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'عميل',eff:(+r.debit||0)-(+r.credit||0)})),
-    ...sr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'مورد',eff:-((+r.debit||0)-(+r.credit||0))}))
+    ...sr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'مورد',eff:(+r.debit||0)-(+r.credit||0)}))
   ].sort((x,y)=>String(x.d).localeCompare(String(y.d)));
   const open=(+cu.opening_balance||0)-(+su.opening_balance||0);
   const before=rowsAll.filter(r=>r.d<a).reduce((t,r)=>t+r.eff,0);
