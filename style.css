@@ -462,3 +462,10 @@ body{background:#f4f6fa}
 .nav-single{display:flex;align-items:center;gap:8px;padding:9px 10px;margin:5px 0;border-radius:10px;font-size:13px;font-weight:900;cursor:pointer;color:#344054}
 .nav-single:hover{background:#f8fafc}
 .nav-single.on{background:#eff6ff;color:#1d4ed8}
+.stmt-bar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.stmt-bar .fm-f{min-width:180px;flex:1 1 180px}
+.stmt-bar .fm-f select,.stmt-bar .fm-f input{min-height:42px}
+.stmt-btns{display:flex;gap:8px;flex-wrap:wrap}
+.stmt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.stmt-head h3{margin:0}
+.stmt-open,.stmt-close{font-weight:800}

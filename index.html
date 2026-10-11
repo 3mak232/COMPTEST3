@@ -246,8 +246,6 @@ async function payPrint(id){const[E,L]=await Promise.all([g('employees','name'),
 async function payrollView(){const E=await g('employees','name'),L=await g('payroll','month');const pvr=window._pv?L.find(x=>x.id===window._pv):null,pvHtml=pvr?`<div class="card"><div class="card-title"><b>تفاصيل الكشف</b><div><button class="s" onclick="payPrint('${pvr.id}')">طباعة</button> <button class="s" onclick="window._pv=null;R()">إغلاق</button></div></div>${T(['البند','القيمة'],payslipRows(pvr,E))}</div>`:'';return `<h2>المرتبات</h2><div class="card np"><div class="row"><select id="pe" onchange="loadPayrollAdjustments()">${O(E)}</select><input id="pmo" type="month" onchange="loadPayrollAdjustments()"><input id="pb2" type="number" placeholder="الأساسي"><input id="po" type="number" placeholder="إضافي"><input id="pbn" type="number" placeholder="مكافأة"><input id="pa" type="number" placeholder="سلف"><input id="pd" type="number" placeholder="خصومات"><input id="pab" type="number" placeholder="غياب"><select id="pac">${O(C.accts)}</select><button class="btn soft" onclick="loadPayrollAdjustments()" title="يعيد جلب المكافآت والجزاءات والسلف المعتمدة لهذا الموظف في هذا الشهر">جلب المعتمد للشهر</button><button onclick="act(async()=>{if(!v('pmo'))throw Error('اختر الشهر');await ins('payroll',{employee_id:v('pe'),month:v('pmo')+'-01',basic:n('pb2')||+(by(E,v('pe')).salary),overtime:n('po'),bonus:n('pbn'),advances:n('pa'),deductions:n('pd'),absence_deductions:n('pab')})})">إنشاء كشف</button></div><p class="muted">اختر الموظف والشهر وستُحمَّل المكافآت والجزاءات المعتمدة تلقائيًا، ويمكن تعديل القيم قبل إنشاء الكشف. زر «جلب المعتمد للشهر» لإعادة التحميل فقط. الكشوف المنشأة تظهر في الجدول بالأسفل، ومن عمود الإجراءات: عرض، طباعة، دفع.</p></div>${pvHtml}<div class="card">${T(['الموظف','الشهر','الأساسي','الصافي','الحالة',''],L.reverse().map(x=>[e(by(E,x.employee_id).name),x.month.slice(0,7),fmt(x.basic),fmt(x.net),x.paid?'مدفوع':'غير مدفوع',`<button class="s" onclick="payShow('${x.id}')">عرض</button> <button class="s" onclick="payPrint('${x.id}')">طباعة</button> ${x.paid?'':`<button onclick="act(()=>rpc('pay_payroll',{p_payroll:'${x.id}',p_account:v('pac')}))">دفع</button>`}`]))}</div>`}
 async function retView(){const SI=await g('sales_invoices','date'),PI=await g('purchase_invoices','date'),sel=window._rk!=='p',L=sel?SI:PI;return `<h2>المرتجعات</h2><div class="card np"><select id="rk" onchange="window._rk=v('rk');RT=null;R()"><option value="s" ${sel?'selected':''}>مرتجع مبيعات</option><option value="p" ${sel?'':'selected'}>مرتجع مشتريات</option></select><select id="ri">${L.map(x=>`<option value="${x.id}">${e(x.number)} — ${fmt(x.total)}</option>`).join('')}</select><button class="s" onclick="loadRet()">عرض البنود</button>${RT?T(['المنتج','الكمية','كمية المرتجع'],RT.items.map((x,i)=>[e(by(C.products,x.product_id).name),x.qty,`<input id="rq${i}" type="number" step="0.001" value="0" style="width:90px">`]))+`<button onclick="act(async()=>{const items=${JSON.stringify(RT.items).replace(/</g,'\\u003c')}.map((x,i)=>({product_id:x.product_id,qty:n('rq'+i)})).filter(x=>x.qty>0);await rpc('${RT.s?'create_sales_return':'create_purchase_return'}',{p_invoice:'${RT.id}',p_items:items});RT=null})">حفظ المرتجع</button>`:''}</div>`}
 async function loadRet(){const s=v('rk')==='s',id=v('ri');const{data,error}=await sb.from(s?'sales_invoice_items':'purchase_invoice_items').select('product_id,qty').eq('invoice_id',id);if(error)throw error;RT={s,id,items:data||[]};R()}
-async function stmtView(){const cu=window._sk!=='s';return `<h2>كشف الحساب</h2><div class="card np"><select id="sk" onchange="window._sk=v('sk');window._stp=null;st='';R()"><option value="c" ${cu?'selected':''}>عميل</option><option value="s" ${cu?'':'selected'}>مورد</option></select><div class="stmt-pick"><input id="sq2" placeholder="ابحث باسم ${cu?'العميل':'المورد'} أو رقم الهاتف" autocomplete="off" oninput="stSearch(this.value)"><div id="stRes" class="stmt-res"></div><div class="muted">الطرف المختار: <b id="stSel">${(by(cu?C.customers:C.suppliers,window._stp)||{}).name?e(by(cu?C.customers:C.suppliers,window._stp).name):'لم يتم اختيار طرف'}</b></div></div> من <input type="date" id="sa"> إلى <input type="date" id="sb2"><button onclick="showStmt()">عرض</button><button class="s" onclick="window.print()">طباعة / PDF</button></div><div class="card">${st||'اختر الطرف والفترة ثم اضغط عرض'}</div>`}
-async function showStmt(){const cu=v('sk')==='c',id=window._stp;if(!id)return alert('ابحث واختر الطرف أولًا');const a=v('sa')||'0000-01-01',b=v('sb2')||'9999-12-31',P_=by(cu?C.customers:C.suppliers),rows=await rpc(cu?'customer_statement':'supplier_statement',{p_party:id,p_to:b}),sg=cu?1:-1;let bal=+P_.opening_balance;const body=rows.filter(r=>r.d>=a).sort((x,y)=>x.d.localeCompare(y.d)).map(r=>{bal+=sg*(r.debit-r.credit);return[r.d,e(r.doc),e(r.descr),fmt(r.debit),fmt(r.credit),fmt(bal)]});st=`<h3>${e(P_.name)}</h3><p>رصيد افتتاحي: <b>${fmt(P_.opening_balance)}</b></p>`+T(['التاريخ','المستند','البيان','مدين','دائن','الرصيد'],body)+`<p>الرصيد الختامي: <b>${fmt(bal)}</b></p>`;R()}
 async function quotationsView(){const L=await g('quotations','date'),tot=cart.q.reduce((a,l)=>a+l.qty*l.price-l.discount,0);return `<h2>عروض الأسعار</h2><div class="card np"><div class="row"><select id="ip">${O(C.customers)}</select><select id="il">${O(C.products.filter(p=>p.active))}</select><input id="iq" type="number" value="1" style="width:80px"><input id="ir" type="number" placeholder="السعر"><input id="id" type="number" placeholder="خصم"><button class="s" onclick="addLine('q')">+ بند</button></div>${cartTable('q')}<p>الإجمالي: <b>${fmt(tot)}</b></p><input id="vu" type="date"><button onclick="act(async()=>{await rpc('create_quotation',{p_customer:v('ip'),p_valid:v('vu')||null,p_items:cart.q});cart.q=[]})">حفظ العرض</button></div><div class="card">${T(['رقم','التاريخ','العميل','صالح حتى','الحالة',''],L.reverse().map(x=>[x.number,x.date,e(by(C.customers,x.customer_id).name),x.valid_until||'',x.status,x.status==='Open'?`<button onclick="act(()=>rpc('quotation_to_order',{p_quo:'${x.id}',p_warehouse:'${(C.warehouses[0]||{}).id}'}))">تحويل لأمر بيع</button>`:'']))}</div>`}
 async function ordersView(){const L=await g('sales_orders','date');return `<h2>أوامر البيع</h2><div class="card np"><select id="oa">${O(C.accts)}</select><input id="op" type="number" placeholder="المدفوع عند التحويل"></div><div class="card">${T(['رقم','التاريخ','العميل','الحالة',''],L.reverse().map(x=>[x.number,x.date,e(by(C.customers,x.customer_id).name),x.status,x.status==='Confirmed'?`<button onclick="act(()=>rpc('order_to_invoice',{p_order:'${x.id}',p_paid:n('op'),p_account:n('op')>0?v('oa'):null,p_method:n('op')>0?'cash':'credit'}))">تحويل لفاتورة</button> <button class="s" onclick="act(()=>rpc('cancel_order',{p_order:'${x.id}'}))">إلغاء</button>`:'']))}</div>`}
 async function usersView(){const L=await g('profiles','created_at');return `<h2>المستخدمون</h2><div class="card">${T(['الاسم','البريد','الدور','مفعّل'],L.map(u=>[e(u.name),e(u.username),`<select onchange="act(()=>upd('profiles','${u.id}',{role:this.value}))">${['admin','accountant','sales','store'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select>`,`<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`]))}</div>`}
@@ -477,7 +475,6 @@ async function paintView(q){
     else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
     if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
-    if(view!=='dash'){const back=(window._nav&&window._nav.length)?'<button class="btn s" onclick="goBack()">↩ رجوع</button>':'';h=`<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">${back}<button class="btn s" onclick="go('dash')">🏠 الرئيسية</button></div>`+h}
   }catch(x){h=`<div class="card error-card"><b>تعذر تحميل الصفحة</b><p>${e(x.message||x)}</p></div>`}
   const links=renderNavGroups();
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
@@ -489,7 +486,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.51';
+const APP_VERSION='v1.52';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1280,7 +1277,6 @@ async function payView(){
 }
 
 // ---------- كشف الحساب: البحث عن الطرف (بدون تغيير سلوك) ----------
-async function stmtView(){const cu=window._sk!=='s';return `<h2>كشف الحساب</h2><div class="card np"><select id="sk" onchange="window._sk=v('sk');window._stp=null;st='';R()"><option value="c" ${cu?'selected':''}>عميل</option><option value="s" ${cu?'':'selected'}>مورد</option></select><div class="stmt-pick"><input id="sq2" placeholder="ابحث باسم ${cu?'العميل':'المورد'} أو رقم الهاتف" autocomplete="off" oninput="stSearch(this.value)"><div id="stRes" class="stmt-res"></div><div class="muted">الطرف المختار: <b id="stSel">${(by(cu?C.customers:C.suppliers,window._stp)||{}).name?e(by(cu?C.customers:C.suppliers,window._stp).name):'لم يتم اختيار طرف'}</b></div></div> من <input type="date" id="sa"> إلى <input type="date" id="sb2"><button onclick="showStmt()">عرض</button><button class="s" onclick="window.print()">طباعة / PDF</button></div><div class="card">${st||'اختر الطرف والفترة ثم اضغط عرض'}</div>`}
 
 // ---------- المستخدمون: تعديل وتغيير كلمة السر والصلاحيات في نوافذ ----------
 async function usersView(){
@@ -1609,7 +1605,7 @@ async function partiesView(){
   const sumR=B.reduce((t,x)=>t+(+x.receivable||0),0), sumP=B.reduce((t,x)=>t+(+x.payable||0),0);
   const rows=L.map(x=>{
     const acts=[`<button class="s" onclick="partyEdit('${x.party_id}')">تعديل</button>`];
-    if(x.customer_id)acts.push(`<button class="s" onclick="partyStmt('${x.customer_id}','c')">كشف الحساب</button>`);
+    if(x.customer_id)acts.push(`<button class="s" onclick="partyStmt('${x.party_id}')">كشف الحساب</button>`);
     acts.push(`<button class="s" onclick="act(()=>rpc('set_party_active',{p_party:'${x.party_id}',p_on:${x.active?'false':'true'}}))">${x.active?'تعطيل':'تفعيل'}</button>`);
     return `<tr data-s="${e((x.name+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase())}"><td><b>${e(x.name)}</b>${x.phone?`<br><small class="muted">${e(x.phone)}</small>`:''}</td><td>${fmt(x.receivable)}</td><td>${fmt(x.payable)}</td><td>${ptNet(x)}</td><td>${x.active?chip('مفعّل','success'):chip('موقوف','warning')}</td><td><div class="row-btns">${acts.join(' ')}</div></td></tr>`;
   }).join('');
@@ -1642,7 +1638,6 @@ async function partyEdit(id){
   },'حفظ');
 }
 function partyRole(id,role,on){return act(()=>rpc('set_party_role',{p_party:id,p_role:role,p_on:!!on,p_credit_limit:0,p_terms:0,p_opening:0}))}
-function partyStmt(id,k){window._sk=k==='s'?'s':'c';window._stp=id;go('stmt')}
 // مدخل الأطراف من القائمة (العملاء والموردين) — الموردين بيفتحوا تبويب الموردين
 const _legacy1=legacyHtml;
 legacyHtml=async function(){
@@ -1730,5 +1725,49 @@ function attSelf(a){return act(()=>rpc('attendance_check',{p_action:a}))}
 const _hrBaseV151=hrView;
 hrView=async function(){const h=await _hrBaseV151();let s='';try{s=await attSelfHtml()}catch{}return s+h};
 
+// كشف حساب الطرف الواحد: عميل ومورد في كشف واحد، برصيد صافي
+async function stmtView(){
+  const P=await g('party_balances','name');
+  const cur=window._stp||'';
+  return `<h2>كشف الحساب</h2><div class="card np stmt-bar">
+    <label class="fm-f"><span>الطرف</span><select id="sp" onchange="window._stp=this.value;st='';R()"><option value="">— اختار طرف —</option>${P.map(x=>`<option value="${x.party_id}" ${x.party_id===cur?'selected':''}>${e(x.name)}</option>`).join('')}</select></label>
+    <label class="fm-f"><span>من</span><input type="date" id="sa" value="${e(window._sa||'')}"></label>
+    <label class="fm-f"><span>إلى</span><input type="date" id="sb2" value="${e(window._sb||'')}"></label>
+    <div class="stmt-btns"><button onclick="showPartyStmt()">عرض الكشف</button><button class="s" onclick="window.print()">طباعة / PDF</button></div>
+  </div><div class="card">${st||'اختار الطرف والفترة واضغط عرض الكشف'}</div>`;
+}
+async function showPartyStmt(){
+  const id=v('sp')||window._stp;
+  if(!id)return alert('اختار الطرف أولاً');
+  window._stp=id; window._sa=v('sa'); window._sb=v('sb2');
+  const a=v('sa')||'0000-01-01', b=v('sb2')||'9999-12-31';
+  const B=(await g('party_balances','name')).find(x=>x.party_id===id)||{};
+  const[cu,su,cr,sr]=await Promise.all([
+    B.customer_id?sb.from('customers').select('opening_balance').eq('id',B.customer_id).single().then(r=>r.data||{}):{},
+    B.supplier_id?sb.from('suppliers').select('opening_balance').eq('id',B.supplier_id).single().then(r=>r.data||{}):{},
+    B.customer_id?rpc('customer_statement',{p_party:B.customer_id,p_to:b}):[],
+    B.supplier_id?rpc('supplier_statement',{p_party:B.supplier_id,p_to:b}):[]]);
+  // أثر كل حركة على الصافي: عميل (مدين = عليه فلوس لينا)، مورد (دائن = لينا فلوس عليه)
+  const rowsAll=[
+    ...cr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'عميل',eff:(+r.debit||0)-(+r.credit||0)})),
+    ...sr.map(r=>({d:r.d,doc:r.doc,descr:r.descr,kind:'مورد',eff:-((+r.debit||0)-(+r.credit||0))}))
+  ].sort((x,y)=>String(x.d).localeCompare(String(y.d)));
+  const open=(+cu.opening_balance||0)-(+su.opening_balance||0);
+  const before=rowsAll.filter(r=>r.d<a).reduce((t,r)=>t+r.eff,0);
+  let bal=open+before;
+  const startBal=bal;
+  const balTxt=x=>Math.abs(x)<0.005?'<span class="muted">متصفّر</span>':x>0?`<span class="good">عليه فلوس لينا ${fmt(x)}</span>`:`<span class="bad">لينا فلوس عليه ${fmt(-x)}</span>`;
+  const body=rowsAll.filter(r=>r.d>=a).map(r=>{
+    bal+=r.eff;
+    const owe=r.eff>0?fmt(r.eff):'', owed=r.eff<0?fmt(-r.eff):'';
+    return [r.d,e(r.doc||''),e(r.descr||''),e(r.kind),owe,owed,balTxt(bal)];
+  });
+  st=`<div class="stmt-head"><div><h3>${e(B.name||'')}</h3>${B.phone?`<small class="muted">${e(B.phone)}</small>`:''}</div>
+      <div class="stmt-open">رصيد أول المدة: ${balTxt(startBal)}</div></div>`
+    +T(['التاريخ','المستند','البيان','النوع','عليه فلوس لينا','لينا فلوس عليه','الرصيد'],body)
+    +`<p class="stmt-close">الرصيد الختامي: ${balTxt(bal)}</p>`;
+  R();
+}
+function partyStmt(id){window._stp=id;st='';go('stmt')}
 </script>
 </body></html>
