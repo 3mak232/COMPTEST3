@@ -266,6 +266,7 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.isDev?'<button class="settings-tile" onclick="pushAppUpdate()"><span class="settings-icon">⟳</span><span><b>تحديث لكل المستخدمين</b><small>يخلي كل المستخدمين يحملوا أحدث نسخة أوتوماتيك من غير Ctrl+F5.</small></span><span class="settings-arrow">‹</span></button>':''}
 </div>
 ${coCardHtml(s)}
+${printCardHtml(s)}
 <div class="card offline-card"><b>النسخ الاحتياطي الكامل</b><p class="muted">النسخة التشغيلية من داخل النظام مخصصة للبيانات العملية. النسخة الكاملة لقاعدة PostgreSQL (الجداول، السياسات، الدوال، Auth) تظل على مستوى Supabase ولا يتم تنفيذها من متصفح المستخدم.</p></div>`}
 async function runSmokeTest(){const box=$('#smokeResult');if(box)box.innerHTML='<p>جاري الاختبار...</p>';try{const r=await rpc('run_erp_smoke_test',{});const show=z=>typeof z==='object'&&z!==null?JSON.stringify(z):String(z??'');const rows=(r.results||[]).map(x=>{const p=x.pass?'✓':'✗';const vals=Object.entries(x).filter(([k])=>!['test','pass'].includes(k)).map(([k,v])=>`${e(k)}=${e(show(v))}`).join(' | ');return`<div class="${x.pass?'good':'bad'}">${p} ${e(x.test)}${vals?' — '+vals:''}</div>`}).join('');if(box)box.innerHTML=`<div class="card"><b class="${r.ok?'good':'bad'}">${r.ok?'نجح اختبار النظام بالكامل':'فشل اختبار النظام'}</b>${rows}<p>تم تنظيف بيانات الاختبار: ${r.cleaned?'نعم':'لا'}</p></div>`}catch(x){if(box)box.innerHTML=`<div class="card bad">فشل تشغيل الاختبار: ${e(x.message||x)}</div>`}}
 function openMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.add('open');if(o)o.classList.add('open');document.body.classList.add('menu-open')}
@@ -488,7 +489,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.56';
+const APP_VERSION='v1.57';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -779,23 +780,24 @@ async function printInvoice(id,s){
     const party=(by(who,s?hdr.customer_id:hdr.supplier_id).name)||'—';
     const [st]=invStatus(bal);
     const rowsHtml=items.map((it,i)=>`<tr><td>${i+1}</td><td>${e(it.products?.name||'')}</td><td>${it.qty}</td><td>${fmt(it.unit_price)}</td><td>${fmt(it.discount)}</td><td>${fmt(it.line_total)}</td></tr>`).join('');
-    const logo=co.logo_url?`<img src="${e(co.logo_url)}" alt="" class="logo">`:'';
+    const pc=printCfg();
+    const logo=pc.showLogo&&co.logo_url?`<img src="${e(co.logo_url)}" alt="" class="logo" style="max-height:${pc.logoMaxH}px">`:'';
     const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${e(hdr.number)}</title><style>
       @page{size:A4;margin:14mm}
       body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#101828;margin:0;font-size:13px}
-      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1d4ed8;padding-bottom:14px}
+      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid ${pc.accent};padding-bottom:14px}
       .logo{max-height:56px;margin-bottom:6px}
       .co b{font-size:18px}.co small{display:block;color:#475467;line-height:1.7}
-      .meta{text-align:left}.meta h1{margin:0;font-size:22px;color:#1d4ed8}.meta div{color:#475467;margin-top:4px}
+      .meta{text-align:left}.meta h1{margin:0;font-size:22px;color:${pc.accent}}.meta div{color:#475467;margin-top:4px}
       .parties{display:flex;justify-content:space-between;margin:18px 0;gap:16px}
       .box{flex:1;background:#f8fafc;border:1px solid #e4e7ec;border-radius:10px;padding:12px}
       .box h4{margin:0 0 6px;color:#667085;font-size:12px}
       table{width:100%;border-collapse:collapse;margin-top:6px}
-      th{background:#eef4ff;color:#1d4ed8;padding:9px;text-align:right;font-size:12px}
+      th{background:#eef4ff;color:${pc.accent};padding:9px;text-align:right;font-size:12px}
       td{padding:9px;border-bottom:1px solid #eaecf0}
       .totals{margin-top:14px;margin-right:auto;width:280px}
       .totals div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #d0d5dd}
-      .totals .grand{font-size:16px;font-weight:800;border-bottom:2px solid #1d4ed8;color:#1d4ed8}
+      .totals .grand{font-size:16px;font-weight:800;border-bottom:2px solid ${pc.accent};color:${pc.accent}}
       .notes{margin-top:18px;color:#475467;white-space:pre-line}
       .sign{display:flex;justify-content:space-between;margin-top:46px;color:#667085}
       .sign div{border-top:1px solid #98a2b3;width:200px;text-align:center;padding-top:6px}
@@ -821,7 +823,7 @@ async function printInvoice(id,s){
 .inv-table th{background:#f8fafc;color:#667085;font-size:12px;text-align:right;padding:10px}
 </style></head><body>
       <div class="head">
-        <div class="co">${logo}<b>${e(co.company_name||'')}</b><small>${e(co.address||'')}${co.phone?'<br>هاتف: '+e(co.phone):''}${co.tax_number?'<br>الرقم الضريبي: '+e(co.tax_number):''}</small></div>
+        <div class="co">${logo}${pc.showName?`<b>${e(co.company_name||'')}</b>`:''}<small>${e(co.address||'')}${co.phone?'<br>هاتف: '+e(co.phone):''}${co.tax_number?'<br>الرقم الضريبي: '+e(co.tax_number):''}</small></div>
         <div class="meta"><h1>${s?'فاتورة بيع':'فاتورة شراء'}</h1><div>رقم: <b>${e(hdr.number)}</b></div><div>التاريخ: ${e(hdr.date||'')}</div>${hdr.due_date?'<div>الاستحقاق: '+e(hdr.due_date)+'</div>':''}<div>الحالة: ${st}</div></div>
       </div>
       <div class="parties"><div class="box"><h4>${s?'العميل':'المورد'}</h4><b>${e(party)}</b></div></div>
@@ -1246,7 +1248,16 @@ async function hrView(){
   const today=new Date().toISOString().slice(0,10);
   const bar=secBar('hr',[['att','الحضور'],['leave','الإجازات'],['adj','مكافآت وجزاءات'],['hol','العطلات']],'att');
   let body='';
-  if(sec==='att') body=`<div class="card form-card"><div class="card-title"><b>تسجيل حضور</b><span class="muted">اختار الموظف والتاريخ والحالة. أوقات الحضور اختيارية.</span></div><div class="row"><select id="he">${O(E)}</select><input id="hd" type="date" value="${today}"><select id="hs"><option>Present</option><option>Late</option><option>Absent</option><option>Leave</option><option>Holiday</option></select><button class="btn" onclick="act(()=>ins('attendance',{employee_id:v('he'),work_date:v('hd'),check_in:v('hi')?new Date(v('hi')).toISOString():null,check_out:v('ho')?new Date(v('ho')).toISOString():null,status:v('hs')}))">تسجيل</button></div><details class="mt10"><summary>أوقات الحضور والانصراف (اختياري)</summary><div class="row"><input id="hi" type="datetime-local"><input id="ho" type="datetime-local"></div></details></div>`;
+  if(sec==='att'){
+    const isAdm=me.role==='admin';
+    const A=await g('attendance','work_date');
+    const form=isAdm?`<div class="card form-card"><div class="card-title"><b>تسجيل حضور يدوي</b><span class="muted">الأدمن بس. اختار الموظف والتاريخ، وبعدين الوقت لو معاك.</span></div>
+      <div class="fm-grid"><label class="fm-f"><span>الموظف</span><select id="he">${O(E)}</select></label><label class="fm-f"><span>التاريخ</span><input id="hd" type="date" value="${today}"></label><label class="fm-f"><span>الحالة</span><select id="hs"><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غايب</option><option value="Leave">إجازة</option><option value="Holiday">عطلة</option></select></label><label class="fm-f"><span>وقت الحضور</span><input id="hi" type="time"></label><label class="fm-f"><span>وقت الانصراف</span><input id="ho" type="time"></label></div>
+      <div class="row" style="margin-top:12px"><button class="btn" onclick="attSave()">حفظ الحضور</button></div></div>`:`<div class="card"><span class="muted">تسجيل الحضور والانصراف للأدمن بس. دي قراءة للسجل.</span></div>`;
+    const attT=t=>t?new Date(t).toLocaleTimeString('ar-EG',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit'}):'—';
+    const rows=A.slice(-200).reverse().map(x=>[x.work_date,e(by(E,x.employee_id).name||'—'),attT(x.check_in),attT(x.check_out),e(x.status)]);
+    body=form+`<div class="card">${T(['التاريخ','الموظف','الحضور','الانصراف','الحالة'],rows)}</div>`;
+  }
   else if(sec==='leave') body=`<div class="card form-card"><div class="card-title"><b>طلب إجازة</b></div><div class="row"><select id="hle">${O(E)}</select><select id="hlt">${O(types)}</select><input id="hf" type="date"><input id="ht" type="date"><input id="hlr" placeholder="السبب"><button class="btn soft" onclick="act(()=>ins('leave_requests',{employee_id:v('hle'),leave_type_id:v('hlt'),from_date:v('hf'),to_date:v('ht'),days:dCount(v('hf'),v('ht')),reason:v('hlr')}))">تقديم الطلب</button></div></div><div class="card">${T(['الموظف','من','إلى','الأيام','الحالة','السبب'],L.map(x=>[e(by(E,x.employee_id).name),x.from_date,x.to_date,x.days,chip(x.status,x.status==='Approved'?'success':x.status==='Rejected'?'danger':'warning'),e(x.reason)]))}</div>`;
   else if(sec==='adj') body=`<div class="card form-card"><div class="card-title"><b>مكافأة / جزاء</b><span class="muted">يُربط بشهر المرتب ويدخل في حسابه.</span></div><div class="row"><select id="ae">${O(E)}</select><select id="ak"><option value="reward">مكافأة</option><option value="penalty">جزاء</option></select><input id="aa" type="number" placeholder="المبلغ"><input id="ad" type="date" value="${today}"><input id="am" type="month"><input id="ar" placeholder="السبب"><button class="btn" onclick="act(()=>ins('employee_adjustments',{employee_id:v('ae'),kind:v('ak'),amount:n('aa'),effective_date:v('ad'),payroll_month:v('am')?v('am')+'-01':null,reason:v('ar')}))">إضافة</button></div></div><div class="card">${T(['الموظف','النوع','المبلغ','التاريخ','الشهر','الاعتماد'],Adj.map(x=>[e(by(E,x.employee_id).name),x.kind==='reward'?'مكافأة':'جزاء',money(x.amount),x.effective_date,x.payroll_month?x.payroll_month.slice(0,7):'—',chip(x.approved?'معتمد':'معلّق',x.approved?'success':'warning')]))}</div>`;
   else body=`<div class="card form-card"><div class="card-title"><b>العطلات الرسمية</b><span class="muted">تُستخدم لتحديد حالة Holiday في الحضور.</span></div><div class="row"><input id="hn" placeholder="اسم العطلة"><input id="hdx" type="date"><label><input type="checkbox" id="hp" checked> مدفوعة</label><button class="btn soft" onclick="act(()=>ins('holidays',{name:v('hn'),holiday_date:v('hdx'),paid:$('#hp').checked}))">إضافة عطلة</button></div></div><div class="card">${T(['العطلة','التاريخ','مدفوعة'],Holi.map(x=>[e(x.name),x.holiday_date,x.paid?'نعم':'لا']))}</div>`;
@@ -1589,7 +1600,7 @@ async function refreshCo(){
 const PRINT_CFG={showLogo:true,showName:true,showAddress:true,logoMaxH:60,accent:'#1d4ed8'};
 // هيدر الطباعة الموحد: اللوجو + اسم الشركة + العنوان والرقم الضريبي
 function brandHtml(){
-  const c=window._co||{},cfg=PRINT_CFG;
+  const c=window._co||{},cfg=printCfg();
   const logo=cfg.showLogo&&c.logo_url?`<img src="${e(c.logo_url)}" alt="" style="max-height:${cfg.logoMaxH}px;max-width:220px;display:block">`:'';
   const name=cfg.showName&&c.company_name?`<b style="font-size:17px;color:#101828">${e(c.company_name)}</b>`:'';
   const addr=cfg.showAddress?[c.address?e(c.address):'',c.tax_number?'الرقم الضريبي: '+e(c.tax_number):''].filter(Boolean).join(' · '):'';
@@ -1600,7 +1611,8 @@ function brandHtml(){
 const _printHtml0=printHtml;
 printHtml=function(title,body,opts){
   const head=(opts&&opts.brand===false)?'':brandHtml();
-  return _printHtml0(title,head+body);
+  const foot=(opts&&opts.brand===false)||!printCfg().footer?'':`<div style="margin-top:18px;padding-top:8px;border-top:1px solid #eaecf0;color:#667085;font-size:11px;text-align:center">${e(printCfg().footer)}</div>`;
+  return _printHtml0(title,head+body+foot);
 };
 const _boot0=boot;
 boot=async function(){await _boot0();refreshCo()};
@@ -1723,6 +1735,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkAppRe
 
 // ----- الحضور الذاتي: الموظف يسجل حضوره وانصرافه بنفسه -----
 async function attSelfHtml(){
+  return ''; // الحضور للأدمن بس: الكارت الذاتي اتقفل
   if(!me)return '';
   const{data:emp}=await sb.from('employees').select('id,name').eq('user_id',me.id).maybeSingle();
   if(!emp)return '';
@@ -1853,6 +1866,55 @@ window.alert=function(m){return _alertDx(dx(String(m)))};
   let queued=false;
   new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;applyDialect(app)})}).observe(app,{childList:true,subtree:true});
 })();
+
+// ===== v1.57 =====
+// ---- الحضور: الأدمن بس يسجل (يوم + وقت حضور/انصراف) ----
+async function attSave(){
+  const d=v('hd');
+  if(!v('he'))return alert('اختار الموظف');
+  if(!d)return alert('اختار التاريخ');
+  const toIso=t=>t?new Date(d+'T'+t).toISOString():null;
+  const row={employee_id:v('he'),work_date:d,status:v('hs')||'Present'};
+  if(toIso(v('hi')))row.check_in=toIso(v('hi'));
+  if(toIso(v('ho')))row.check_out=toIso(v('ho'));
+  await act(async()=>{const{error}=await sb.from('attendance').upsert(row,{onConflict:'employee_id,work_date'});if(error)throw error});
+}
+
+// ---- تخصيص الطباعة (الأدمن والمطور من الويب) ----
+const PRINT_DEFAULTS={showLogo:true,showName:true,showAddress:true,logoMaxH:60,accent:'#1d4ed8',footer:''};
+function printCfg(){const s=(window._co&&window._co.print_settings)||{};return Object.assign({},PRINT_DEFAULTS,s)}
+function printCardHtml(){
+  if(!me||me.role!=='admin')return '';
+  const c=printCfg();
+  const chk=(id,on,lbl)=>`<label class="co-switch"><input type="checkbox" id="${id}" ${on?'checked':''}><span><b>${lbl}</b></span></label>`;
+  return `<div class="card co-card"><div class="co-sec"><h4>تخصيص الطباعة</h4>
+    <p class="muted" style="margin:0 0 10px">الإعدادات دي بتتطبق على كل تصاميم الطباعة: الكشوف والمرتبات والتحويلات والفواتير.</p>
+    <div class="co-switches">${chk('pc_logo',c.showLogo,'إظهار اللوجو')}${chk('pc_name',c.showName,'إظهار اسم الشركة')}${chk('pc_addr',c.showAddress,'إظهار العنوان والرقم الضريبي')}</div>
+    <div class="fm-grid">
+      <label class="fm-f"><span>حجم اللوجو (بكسل)</span><input id="pc_h" type="number" min="20" max="160" value="${e(c.logoMaxH)}"></label>
+      <label class="fm-f"><span>لون الخط الفاصل</span><input id="pc_acc" type="color" value="${e(c.accent)}" style="min-height:42px;padding:4px"></label>
+      <label class="fm-f"><span>نص أسفل الطباعة</span><input id="pc_foot" value="${e(c.footer)}" placeholder="مثلاً: شكراً لتعاملكم معنا"></label>
+    </div>
+    <div class="co-foot"><small class="muted">التغيير بيظهر في أي طباعة جديدة.</small><button onclick="savePrintCfg()">حفظ تخصيص الطباعة</button></div></div></div>`;
+}
+async function savePrintCfg(){
+  const cfg={showLogo:$('#pc_logo').checked,showName:$('#pc_name').checked,showAddress:$('#pc_addr').checked,
+    logoMaxH:Math.max(20,Math.min(160,parseInt(v('pc_h'))||60)),accent:v('pc_acc')||'#1d4ed8',footer:v('pc_foot')||''};
+  await act(async()=>{await upd('company_settings',1,{print_settings:cfg});await refreshCo()});
+}
+
+// ---- مسح الملفات المخزنة محلياً عند الدخول والخروج ----
+async function clearLocalData(){
+  let dial=null;try{dial=localStorage.getItem('erp_dialect')}catch{}
+  try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch{}
+  try{sessionStorage.clear()}catch{}
+  try{localStorage.clear()}catch{}
+  try{if(dial)localStorage.setItem('erp_dialect',dial)}catch{}
+}
+const _login157=login;
+login=async function(){await clearLocalData();return _login157()};
+const _logout157=logout;
+logout=async function(){const r=await _logout157();await clearLocalData();return r};
 
 </script>
 </body></html>
