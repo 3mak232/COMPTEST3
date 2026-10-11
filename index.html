@@ -52,7 +52,7 @@ const canMaster=()=>!!me&&['admin','accountant','store'].includes(me.role);
 const isAdminRole=()=>!!me&&me.role==='admin';
 const DISC_MAX_PCT={sales:5};
 const canBase=x=>me&&(P[me.role]==='*'||P[me.role].includes(x));
-const can=x=>{if(!me)return false;if(x==='cust')return canRaw('cust')||canRaw('supp');return canRaw(x)};const canRaw=x=>{if(x==='health')return !!me.isDev;if(me.role==='admin')return true;if(!canBase(x))return false;if(customPermMode==='custom')return customPerms.has(x);return true};
+const can=x=>{if(!me)return false;if(x==='cust')return canRaw('cust')||canRaw('supp');return canRaw(x)};const canRaw=x=>{if(x==='health'||x==='devset')return !!me.isDev;if(me.role==='admin')return true;if(!canBase(x))return false;if(customPermMode==='custom')return customPerms.has(x);return true};
 const NAV=[['dash','الرئيسية'],['prod','المنتجات'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','أذونات التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلامات المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','المدفوعات'],['exp','المصروفات'],['cash','الخزينة'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','تحويل مخزني'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الحضور والإجازات'],['prl','المرتبات'],['mfg','التصنيع'],['pos','نقطة البيع'],['proj','المشروعات والخدمات'],['org','الفروع ومراكز التكلفة'],['period','الفترات المالية'],['appr','الاعتمادات'],['chk','الشيكات'],['taxdoc','المستندات الضريبية'],['int','التكاملات'],['rep','التقارير'],['jr','الحسابات'],['health','فحص الجاهزية'],['users','المستخدمون'],['audit','سجل العمليات'],['set','الإعدادات']];
 const rpc=async(f,a={})=>{const{data,error}=await sb.rpc(f,a);if(error)throw error;return data};
 const ins=async(t,o)=>{const{data,error}=await sb.from(t).insert(o).select().single();if(error)throw error;return data};
@@ -134,8 +134,8 @@ async function auditView(){
  if(ov.error)throw ov.error; if(q1.error)throw q1.error;
  const cnt={};(ov.data||[]).forEach(x=>{const d=cday(x.created_at);cnt[d]=(cnt[d]||0)+1});
  const L=(q1.data||[]).filter(x=>cday(x.created_at)===day);
- const rows=L.map(x=>[new Date(x.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'}),e(x.user_name||PN[x.user_id]||'—'),e(auAct(x.action)),e(auEnt(x.entity)),e(x.description||'')]);
- const texts=L.map(x=>[x.user_name||'',auAct(x.action),auEnt(x.entity),x.description||''].join(' '));
+ const rows=L.map(x=>[new Date(x.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'}),e(x.user_name||PN[x.user_id]||'—'),e(auAct(x.action)),e(auEnt(x.entity)),e(auDesc(x))]);
+ const texts=L.map(x=>[x.user_name||'',auAct(x.action),auEnt(x.entity),auDesc(x)].join(' '));
  const strip=[...Array(14)].map((_,i)=>cday(new Date(Date.now()-i*86400000))).map(d=>{const lbl=new Date(d+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',timeZone:'Africa/Cairo'});return `<button class="day-btn${d===day?' on':''}" onclick="auDay('${d}')"><b>${lbl}</b><small>${d===today?'اليوم · مفتوح':'مقفول'} · ${cnt[d]||0} عملية</small></button>`}).join('');
  const dl=new Date(day+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Cairo'});
  const mv=await mvHtml(day,PN);
@@ -264,8 +264,8 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.role==='admin'?settingsLink('audit','سجل العمليات','مراجعة العمليات والتغييرات.','⌁'):''}
   ${me.isDev?settingsLink('health','فحص الجاهزية','فحوصات الصحة وGo-Live.','♥'):''}
   <button class="settings-tile" onclick="toggleDialect()"><span class="settings-icon">ع</span><span><b>أسلوب الكلام: ${dialectMode()==='msa'?'فصحى':'عامية مصرية'}</b><small>اضغط عشان تبدّل بين العامية المصرية والفصحى (التبديل ده على الجهاز ده).</small></span><span class="settings-arrow">‹</span></button>
-  ${me.isDev?'<button class="settings-tile" onclick="pushAppUpdate()"><span class="settings-icon">⟳</span><span><b>تحديث لكل المستخدمين</b><small>يخلي كل المستخدمين يحملوا أحدث نسخة أوتوماتيك من غير Ctrl+F5.</small></span><span class="settings-arrow">‹</span></button>':''}
-${me.isDev?'<button class="settings-tile" onclick="devToggleLock()"><span class="settings-icon">🔒</span><span><b>قفل / فتح الموقع</b><small>لما يتقفل، أي مستخدم غير المطور يشوف رسالة الصيانة ومايقدرش يشتغل، والداتا بتتقفل على السيرفر.</small></span><span class="settings-arrow">‹</span></button><button class="settings-tile" onclick="devRevokeAll()"><span class="settings-icon">⎋</span><span><b>تسجيل خروج لكل المستخدمين</b><small>يقفل كل الجلسات الحالية، ولازم كل حد يسجل دخول تاني (وحسابك كمان).</small></span><span class="settings-arrow">‹</span></button>':''}
+  ${me.isDev?'<button class="settings-tile" onclick="go(\'devset\')"><span class="settings-icon">⚙</span><span><b>إعدادات المطور</b><small>قفل الموقع وفتحه، خروج كل الجلسات، تحديث الواجهة، والفحوصات.</small></span><span class="settings-arrow">‹</span></button>':''}
+
 </div>
 ${coCardHtml(s)}
 ${printCardHtml(s)}
@@ -475,7 +475,7 @@ async function paintView(q){
     if(view==='dash')h=await dash(); else if(view==='po')h=await poView(); else if(view==='grn')h=await grnView(); else if(view==='dn')h=await dnView();
     else if(view==='asset')h=await assetView(); else if(view==='bank')h=await bankView(); else if(view==='price')h=await priceView();
     else if(view==='hr')h=await hrView(); else if(view==='mfg')h=await mfgView(); else if(view==='pos')h=await posView(); else if(view==='proj')h=await projView(); else if(view==='period')h=await periodView();
-    else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='rep')h=await reportsView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
+    else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='devset')h=await devSetView(); else if(view==='rep')h=await reportsView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
     else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
     if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
@@ -485,13 +485,13 @@ async function paintView(q){
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
   const viewChanged=window._animView!==view;window._animView=view;
   if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){const pg=$('.page');if(window._lastLinks!==links){$('nav').innerHTML=links;window._lastLinks=links}pg.innerHTML=h;if(viewChanged){pg.classList.remove('pg-in');void pg.offsetWidth;pg.classList.add('pg-in')}$('.mobile-bottom').innerHTML=bottomNav()}
-  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div><span class="ver-pill" title="رقم الإصدار">${APP_VERSION}</span>${me.isDev?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
+  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.isDev?'مطور':me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div><span class="ver-pill" title="رقم الإصدار">${APP_VERSION}</span>${me.isDev?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
   if(q){const i=$('#q');if(i){i.focus();i.setSelectionRange(99,99)}}
   updateOnlineStatus();
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.61';
+const APP_VERSION='v1.62';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -527,7 +527,7 @@ function hideLockScreen(){document.getElementById('lockScreen')?.remove()}
 async function lockGate(loggedIn){
   let st=null;try{st=await rpc('app_lock_state',{})}catch{}
   if(!st)return false;
-  if(st.locked&&loggedIn&&!st.is_dev){showLockScreen(st.msg);return true}
+  if(st.locked&&loggedIn&&!st.bypass){showLockScreen(st.msg);return true}
   hideLockScreen();return false;
 }
 async function checkAppLock(){
@@ -541,7 +541,7 @@ async function checkAppLock(){
       try{await sb.auth.signOut()}catch{}
       location.reload();return;
     }
-    if(user&&st.locked&&!st.is_dev){showLockScreen(st.msg)}
+    if(user&&st.locked&&!st.bypass){showLockScreen(st.msg)}
     else if(document.getElementById('lockScreen')){location.reload()}
   }catch{}
 }
@@ -551,19 +551,26 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkAppLo
 async function devToggleLock(){
   try{
     const st=await rpc('app_lock_state',{});
-    if(st.locked){
-      if(!confirm('نفتح الموقع لكل المستخدمين؟'))return;
-      await rpc('dev_set_lock',{p_locked:false,p_msg:''});
-      alert('الموقع اتفتح.');
-    }else{
-      const m=prompt('رسالة الصيانة اللي هتظهر للمستخدمين:','الموقع تحت الصيانة، جرّب بعد شوية.');
-      if(m===null)return;
-      if(!confirm('نقفل الموقع؟ كل المستخدمين غير المطور هيتقفلوا فوراً.'))return;
-      await rpc('dev_set_lock',{p_locked:true,p_msg:m});
-      alert('الموقع اتقفل.');
-    }
-    await R();
+    const rn={admin:'الأدمن',accountant:'المحاسب',sales:'المبيعات',store:'المخزن'};
+    const cur=new Set(st.roles||[]);
+    formModal('قفل الموقع',
+      `<label class="fm-f"><span>رسالة الصيانة اللي هتظهر للمستخدمين</span><textarea id="lk_m" rows="3">${e(st.msg||'الموقع تحت الصيانة، جرّب بعد شوية.')}</textarea></label>`+
+      `<div class="fm-f"><span>مسموح دخولهم وقت القفل (المطور دايماً مسموح)</span>${Object.keys(rn).map(r=>`<label style="display:block;margin:4px 0"><input type="checkbox" class="lk_r" value="${r}" ${cur.has(r)?'checked':''}> ${rn[r]}</label>`).join('')}</div>`+
+      `<label class="fm-f"><span>ينتهي القفل في (اختياري، اتركه فاضي لو هتفتحه بإيدك)</span><input id="lk_u" type="datetime-local"></label>`,
+      async()=>{
+        const m=v('lk_m');
+        const roles=[...document.querySelectorAll('.lk_r:checked')].map(x=>x.value);
+        const u=v('lk_u');
+        const until=u?new Date(u).toISOString():null;
+        await rpc('dev_set_lock',{p_locked:true,p_msg:m,p_roles:roles,p_until:until});
+        await R();
+      },'تطبيق القفل');
   }catch(x){alert('تعذر: '+(x.message||x))}
+}
+async function devUnlock(){
+  if(!confirm('نفتح الموقع لكل المستخدمين؟'))return;
+  try{await rpc('dev_set_lock',{p_locked:false,p_msg:'',p_roles:[],p_until:null});alert('الموقع اتفتح.');await R()}
+  catch(x){alert('تعذر: '+(x.message||x))}
 }
 async function devRevokeAll(){
   if(!confirm('نسجّل خروج كل المستخدمين؟ حسابك كمان هيتقفل ولازم تسجل دخول تاني.'))return;
@@ -574,6 +581,32 @@ async function devRevokeAll(){
     location.reload();
   }catch(x){alert('تعذر: '+(x.message||x))}
 }
+
+// ----- إعدادات المطور (v1.62) -----
+async function devSetView(){
+  if(!me||!me.isDev)return `<div class="card"><p class="muted">هذه الصفحة للمطور فقط.</p></div>`;
+  const st=await rpc('app_lock_state',{});
+  const rn={admin:'الأدمن',accountant:'المحاسب',sales:'المبيعات',store:'المخزن'};
+  const who=(st.roles||[]).map(r=>rn[r]||r).join('، ')||'المطور بس';
+  const until=st.until?new Date(st.until).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'}):'يدوي (بيتفتح بإيدك)';
+  return `${sectionHead('إعدادات المطور','أدوات المطور بس. كل تغيير هنا بيتسجل في سجل العمليات.')}
+  <div class="card"><div class="card-title"><b>قفل الموقع</b> ${chip(st.locked?'مقفول':'مفتوح',st.locked?'warning':'success')}</div>
+    <p class="muted">الرسالة: ${e(st.msg||'—')}</p>
+    <p class="muted">مسموح دخولهم وقت القفل: ${e(who)}</p>
+    <p class="muted">ينتهي: ${e(until)}</p>
+    <div class="row-btns"><button class="s" onclick="devToggleLock()">${st.locked?'تعديل القفل':'قفل الموقع'}</button>${st.locked?'<button class="s" onclick="devUnlock()">فتح الموقع</button>':''}</div></div>
+  <div class="card"><div class="card-title"><b>خروج كل المستخدمين</b></div>
+    <p class="muted">يقفل كل الجلسات الحالية، ولازم كل حد يسجل دخول تاني (وحسابك كمان).</p>
+    <div class="row-btns"><button class="s" onclick="devRevokeAll()">تسجيل خروج للكل</button></div></div>
+  <div class="card"><div class="card-title"><b>تحديث الواجهة</b></div>
+    <p class="muted">يخلي كل المستخدمين يحملوا أحدث نسخة أوتوماتيك.</p>
+    <div class="row-btns"><button class="s" onclick="pushAppUpdate()">إرسال التحديث</button></div></div>
+  <div class="card"><div class="card-title"><b>فحوصات</b></div>
+    <div class="row-btns"><button class="s" onclick="go('health')">فحص الجاهزية</button><button class="s" onclick="go('audit')">سجل العمليات</button></div></div>`;
+}
+Object.assign(AU_ACT,{insert:'إضافة'});
+Object.assign(AU_ENT,{app_control:'إعدادات التحكم بالنظام',parties:'طرف (عميل/مورد)',attendance:'حضور',accounts:'حساب (دليل)',approval_requests:'طلب اعتماد',asset_categories:'تصنيف أصول',bank_statement_lines:'سطر كشف بنك',bank_statements:'كشف بنك',bom_items:'مكون تصنيع',boms:'وصفة تصنيع',branches:'فرع',cash_movements:'حركة خزينة',categories:'تصنيف',commission_rules:'قاعدة عمولة',cost_centers:'مركز تكلفة',delivery_note_items:'صنف إذن تسليم',goods_receipt_items:'صنف استلام',integration_connections:'اتصال تكامل',integration_events:'حدث تكامل',inventory_lot_balances:'رصيد دفعة مخزون',inventory_lots:'دفعة مخزون',inventory_serials:'رقم تسلسلي',journal_lines:'سطر قيد',leave_requests:'طلب إجازة',leave_types:'نوع إجازة',notifications:'إشعار',payment_allocations:'توزيع دفعة',pos_session_sales:'مبيعات جلسة كاشير',pos_sessions:'جلسة كاشير',price_list_items:'صنف قائمة أسعار',price_lists:'قائمة أسعار',product_barcodes:'باركود',projects:'مشروع',purchase_invoice_items:'صنف فاتورة شراء',purchase_order_items:'صنف أمر شراء',purchase_return_items:'صنف مرتجع شراء',quotation_items:'صنف عرض سعر',sales_commissions:'عمولة مبيعات',sales_invoice_items:'صنف فاتورة بيع',sales_order_items:'صنف أمر بيع',sales_return_items:'صنف مرتجع بيع',service_tickets:'تذكرة خدمة',shifts:'وردية',stock_movements:'حركة مخزون',stock_transfer_items:'صنف تحويل مخزني',stocktake_items:'صنف جرد',tax_documents:'مستند ضريبي',units:'وحدة قياس',user_quick_actions:'اختصار مستخدم',audit_logs:'سجل العمليات'});
+const auDesc=x=>{const d=x.description||'';const m=d.match(/^DB trigger: (\w+) on (\w+)/);if(!m)return d;const pre={INSERT:'إضافة سجل في ',UPDATE:'تعديل سجل في ',DELETE:'حذف سجل من '}[m[1]]||'';return pre+(AU_ENT[m[2]]||m[2])};
 async function boot(){const{data:{user}}=await sb.auth.getUser();
   if(await lockGate(!!user))return;me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMobileNav()});
@@ -1361,7 +1394,7 @@ async function usersView(){
   const isA=isAdminRole();
   const rows=L.map(u=>{
     const top=(u.role==='admin'||u.role==='developer');
-    return [e(u.name),e(u.username),top?'<b>admin</b>':e(u.role),chip(top?'كامل':(u.permissions_mode==='custom'?'مخصص':'حسب الدور'),top?'success':(u.permissions_mode==='custom'?'warning':'info')),
+    return [`${e(u.name)}${u.role==='developer'?' '+chip('مطور','warning'):''}`,e(u.username),u.role==='developer'?'<b>مطور</b>':(top?'<b>admin</b>':e(u.role)),chip(top?'كامل':(u.permissions_mode==='custom'?'مخصص':'حسب الدور'),top?'success':(u.permissions_mode==='custom'?'warning':'info')),
       `<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`,
       `<div class="row-btns">${isA?`<button class="s" onclick="userEdit('${u.id}')">تعديل</button><button class="s" onclick="userResetPw('${u.id}')">تغيير كلمة السر</button>`:''}${top?'':`<button class="s" onclick="openPermissionEditor('${u.id}')">الصلاحيات</button>`}</div>`];
   });
@@ -1415,8 +1448,8 @@ async function auditView(){
   const cnt={};(ov.data||[]).forEach(x=>{const d=cday(x.created_at);cnt[d]=(cnt[d]||0)+1});
   const L=(q1.data||[]).filter(x=>cday(x.created_at)===day);
   const tm=x=>new Date(x.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'});
-  const rows=L.map(x=>[tm(x),e(x.user_name||PN[x.user_id]||'—'),e(auAct(x.action)),e(auEnt(x.entity)),e(x.description||'')]);
-  const texts=L.map(x=>[x.user_name||'',auAct(x.action),auEnt(x.entity),x.description||''].join(' '));
+  const rows=L.map(x=>[tm(x),e(x.user_name||PN[x.user_id]||'—'),e(auAct(x.action)),e(auEnt(x.entity)),e(auDesc(x))]);
+  const texts=L.map(x=>[x.user_name||'',auAct(x.action),auEnt(x.entity),auDesc(x)].join(' '));
   const dl=new Date(day+'T12:00:00Z').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Africa/Cairo'});
   const bar=secBar('aud',[['log','سجل العمليات'],['mv','حركات المخزون']],'log');
   let body;
