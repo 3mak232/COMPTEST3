@@ -1,4 +1,4 @@
-const URL_='https://qzvnuyapnkkhxdlocpms.supabase.co',KEY='sb_publishable_nOGPR20SXq8HMBCHEo166w_b1PstYxN';
+const _CFG=window.ERP_CONFIG||{};const URL_=_CFG.supabaseUrl||'https://qzvnuyapnkkhxdlocpms.supabase.co',KEY=_CFG.supabasePublishableKey||'sb_publishable_nOGPR20SXq8HMBCHEo166w_b1PstYxN';
 const TRUST_KEY='erp_dev_trust';
 const trustTok=()=>{try{return localStorage.getItem(TRUST_KEY)||''}catch(_){return ''}};
 const newTrustTok=()=>[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -756,7 +756,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.88';
+const APP_VERSION='v1.89';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;

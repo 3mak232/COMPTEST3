@@ -1,5 +1,5 @@
-const CACHE='erp-business-shell-v88';
-const ASSETS=['./','./index.html','./app.js','./style.css','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
+const CACHE='erp-business-shell-v89';
+const ASSETS=['./','./index.html','./app.js','./config.js','./style.css','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 // الشبكة أولاً: أي تحديث بيوصل المستخدم فوراً، والكاش بيشتغل بس لو مفيش نت
