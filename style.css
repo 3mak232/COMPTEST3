@@ -684,3 +684,22 @@ body{background:#f4f6fa}
   .pf-row em{grid-column:1/-1;text-align:start;margin-top:-4px}
   .pf-bars{height:160px}
 }
+
+/* v1.84 reports customization + export */
+.rp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.rp-head>div:first-child{min-width:0;display:grid;gap:4px}
+.rp-d{line-height:1.5}
+.rp-acts{display:flex;gap:6px;flex-wrap:wrap}
+.rp-card.rp-off .rp-body{display:none}
+.rp-card.rp-off{opacity:.75}
+.rp-sub{font-weight:700;margin:12px 0 6px;color:var(--muted)}
+.rp-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.rp-body{min-width:0}
+
+/* v1.84 barcode scanner + search row */
+.doc-search-row{display:flex;gap:8px;align-items:center}
+.doc-search-row input{flex:1;min-width:0}
+.scan-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}
+.scan-box{background:var(--card,#fff);color:var(--ink,#111);border-radius:14px;padding:14px;width:min(420px,100%);display:grid;gap:10px}
+.scan-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#scanVid{width:100%;max-height:60vh;border-radius:10px;background:#000;object-fit:cover}
