@@ -251,12 +251,12 @@ async function quotationsView(){const L=await g('quotations','date'),tot=cart.q.
 async function ordersView(){const L=await g('sales_orders','date');return `<h2>أوامر البيع</h2><div class="card np"><select id="oa">${O(C.accts)}</select><input id="op" type="number" placeholder="المدفوع عند التحويل"></div><div class="card">${T(['رقم','التاريخ','العميل','الحالة',''],L.reverse().map(x=>[e(x.number),x.date,e(by(C.customers,x.customer_id).name),x.status,x.status==='Confirmed'?`<button onclick="act(()=>rpc('order_to_invoice',{p_order:'${x.id}',p_paid:n('op'),p_account:n('op')>0?v('oa'):null,p_method:n('op')>0?'cash':'credit'}))">تحويل لفاتورة</button> <button class="s" onclick="act(()=>rpc('cancel_order',{p_order:'${x.id}'}))">إلغاء</button>`:'']))}</div>`}
 async function usersView(){const L=await g('profiles','created_at');return `<h2>المستخدمون</h2><div class="card">${T(['الاسم','البريد','الدور','مفعّل'],L.map(u=>[e(u.name),e(u.username),`<select onchange="act(()=>upd('profiles','${u.id}',{role:this.value}))">${['admin','accountant','sales','store'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select>`,`<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`]))}</div>`}
 function settingsLink(id,title,desc,icon='⚙'){return can(id)?`<button class="settings-tile" onclick="go('${id}')"><span class="settings-icon">${icon}</span><span><b>${title}</b><small>${desc}</small></span><span class="settings-arrow">‹</span></button>`:''}
-async function backupOperationalData(){return withLoading(async()=>{const keys=['products','customers','suppliers','warehouses','stock_balances','customer_balances','supplier_balances','employees'];const out={version:'ERP-V15',created_at:new Date().toISOString()};for(const k of keys){try{out[k]=await g(k,k==='employees'?'name':k==='products'||k==='customers'||k==='suppliers'?'created_at':null)}catch{out[k]=[]}}if(me.role==='admin'||me.role==='accountant'){try{out.cash_accounts=await g('cash_accounts','name')}catch{}};const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='erp_operational_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('تم تنزيل نسخة بيانات تشغيلية');},'جاري تجهيز النسخة الاحتياطية...','لا يتم تضمين كلمات المرور أو بيانات الدخول')}
 async function settingsView(){const{data:s,error}=await sb.from('company_settings').select('*').single();if(error)throw error;return `${sectionHead('الإعدادات والإدارة','كل أدوات الإدارة في مكان واحد، والقائمة الجانبية تظل مختصرة.')}
 <div class="settings-grid">
   ${me.role==='admin'?settingsLink('users','المستخدمون والصلاحيات','إنشاء المستخدمين، تفعيلهم، واختيار تخصيص الصلاحيات لكل مستخدم.','👥'):''}
+  ${me.role==='admin'?settingsLink('cosettings','البيانات الأساسية للشركة','اسم الشركة والرقم الضريبي وبادئة الفواتير والضريبة والمخزون وحد الخصم واللوجو.','🧾'):''}
+  ${me.role==='admin'?settingsLink('printcfg','تخصيص الطباعة','اللوجو واسم الشركة والعنوان ولون الخط الفاصل ونص أسفل الطباعة.','🖨'):''}
   ${settingsLink('data','الاستيراد والتصدير','CSV للبيانات الأساسية والأرصدة الافتتاحية.','⇄')}
-  ${me.role==='admin'?`<button class="settings-tile" onclick="backupOperationalData()"><span class="settings-icon">💾</span><span><b>نسخة احتياطية تشغيلية</b><small>تنزيل بيانات العمل الحالية بصيغة JSON بدون كلمات مرور.</small></span><span class="settings-arrow">↓</span></button>`:''}
   ${me.role==='admin'?settingsLink('org','الفروع ومراكز التكلفة','إدارة الهيكل التنظيمي ومراكز التكلفة.','🏢'):''}
   ${me.role==='admin'?settingsLink('period','الفترات والإقفال','فتح وإقفال الفترات ومراقبة القيود.','🗓'):''}
   ${me.role==='admin'?settingsLink('appr','الاعتمادات','إدارة طلبات الاعتماد والموافقات.','✓'):''}
@@ -267,9 +267,27 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.isDev?'<button class="settings-tile" onclick="go(\'devset\')"><span class="settings-icon">⚙</span><span><b>إعدادات المطور</b><small>قفل الموقع وفتحه، خروج كل الجلسات، تحديث الواجهة، والفحوصات.</small></span><span class="settings-arrow">‹</span></button>':''}
 
 </div>
-${coCardHtml(s)}
-${printCardHtml(s)}
-<div class="card offline-card"><b>النسخ الاحتياطي الكامل</b><p class="muted">النسخة التشغيلية من داخل النظام مخصصة للبيانات العملية. النسخة الكاملة لقاعدة PostgreSQL (الجداول، السياسات، الدوال، Auth) تظل على مستوى Supabase ولا يتم تنفيذها من متصفح المستخدم.</p></div>`}
+<div class="card offline-card"><b>النسخ الاحتياطي الكامل</b><p class="muted">النسخة الكاملة (قاعدة البيانات والمستخدمين والملفات) بتتعمل تلقائياً كل يوم على Google Drive، وبتتشفّر. الاستعادة حالياً بتتم من جهاز المطور.</p></div>`}
+async function coSettingsView(){const{data:s,error}=await sb.from('company_settings').select('*').single();if(error)throw error;return `${sectionHead('البيانات الأساسية للشركة','بيانات الفواتير والضريبة والمخزون وحد الخصم.')}${coCardHtml(s)}`}
+function printSettingsView(){return `${sectionHead('تخصيص الطباعة','إعدادات الطباعة لكل الكشوف والفواتير.')}${printCardHtml()}`}
+// ----- التحقق الثنائي: إعدادات المطور (v1.69) -----
+async function devMfaCard(){
+  let st;try{st=await rpc('admin_mfa_state',{})}catch(x){return `<div class="card"><b>التحقق الثنائي للأدمن</b><p class="bad">تعذر تحميل الإعدادات: ${e(x.message||x)}</p></div>`}
+  const methods=st.methods||['totp'];
+  const all=[['totp','تطبيق Authenticator (Google / Microsoft)',true],['sms','رسالة SMS على الموبايل',false],['email','كود على الإيميل',false],['whatsapp','واتساب',false]];
+  const admins=st.admins||[];
+  const pending=admins.filter(a=>a.active&&!a.mfa).length;
+  return `<div class="card"><div class="card-title"><b>التحقق الثنائي للأدمن</b> ${chip(st.require?'إجباري':'اختياري',st.require?'warning':'info')}</div>
+    <p class="muted">اختار الطرق اللي تتقبل للتحقق. حالياً التطبيق بيدعم Authenticator بس، والباقي يتفتح لما نربط مزوّد له.</p>
+    <div class="co-switches">${all.map(([id,lbl,ok])=>`<label class="co-switch"><input type="checkbox" class="mfa_m" value="${id}" ${methods.includes(id)?'checked':''} ${ok?'':'disabled'}><span><b>${e(lbl)}</b>${ok?'':'<small>قريباً</small>'}</span></label>`).join('')}</div>
+    <div class="row-btns"><button class="s" onclick="devSaveMfaMethods()">حفظ الطرق</button></div>
+    <p class="muted">لما الإجبار يتفعل، أي أدمن أو مطور مش مفعّل التحقق مش هيقدر يوصل للبيانات. ومش هيتفعل غير لما كل الأدمن يكونوا مفعّلين (${pending?'فيه '+pending+' لسه مش مفعّل':'كلهم مفعّلين'}).</p>
+    <div class="row-btns"><button class="s" onclick="devToggleMfaRequire(${!st.require})">${st.require?'إيقاف الإجبار':'تفعيل الإجبار'}</button></div>
+    ${T(['الاسم','الدور','التحقق'],admins.map(a=>[e(a.name||'—'),a.role==='developer'?'مطور':'أدمن',a.mfa?chip('مفعّل','success'):chip('مش مفعّل','warning')]))}
+  </div>`;
+}
+async function devSaveMfaMethods(){const m=[...document.querySelectorAll('.mfa_m:checked')].map(x=>x.value);await act(async()=>{await rpc('admin_mfa_set_methods',{p_methods:m})})}
+async function devToggleMfaRequire(on){if(on&&!confirm('نفعّل إجبار التحقق الثنائي؟ الأدمن اللي مش مفعّله مش هيقدر يوصل للبيانات.'))return;await act(async()=>{await rpc('admin_mfa_set',{p_require:on})})}
 async function runSmokeTest(){const box=$('#smokeResult');if(box)box.innerHTML='<p>جاري الاختبار...</p>';try{const r=await rpc('run_erp_smoke_test',{});const show=z=>typeof z==='object'&&z!==null?JSON.stringify(z):String(z??'');const rows=(r.results||[]).map(x=>{const p=x.pass?'✓':'✗';const vals=Object.entries(x).filter(([k])=>!['test','pass'].includes(k)).map(([k,v])=>`${e(k)}=${e(show(v))}`).join(' | ');return`<div class="${x.pass?'good':'bad'}">${p} ${e(x.test)}${vals?' — '+vals:''}</div>`}).join('');if(box)box.innerHTML=`<div class="card"><b class="${r.ok?'good':'bad'}">${r.ok?'نجح اختبار النظام بالكامل':'فشل اختبار النظام'}</b>${rows}<p>تم تنظيف بيانات الاختبار: ${r.cleaned?'نعم':'لا'}</p></div>`}catch(x){if(box)box.innerHTML=`<div class="card bad">فشل تشغيل الاختبار: ${e(x.message||x)}</div>`}}
 function openMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.add('open');if(o)o.classList.add('open');document.body.classList.add('menu-open')}
 function closeMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.remove('open');if(o)o.classList.remove('open');document.body.classList.remove('menu-open')}
@@ -476,7 +494,7 @@ async function paintView(q){
     else if(view==='asset')h=await assetView(); else if(view==='bank')h=await bankView(); else if(view==='price')h=await priceView();
     else if(view==='hr')h=await hrView(); else if(view==='mfg')h=await mfgView(); else if(view==='pos')h=await posView(); else if(view==='proj')h=await projView(); else if(view==='period')h=await periodView();
     else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='devset')h=await devSetView(); else if(view==='rep')h=await reportsView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
-    else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else h=await legacyHtml();
+    else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else if(view==='cosettings')h=await coSettingsView(); else if(view==='printcfg')h=await printSettingsView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
     if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
     if(view!=='dash'){const back=(window._nav&&window._nav.length)?'<button class="btn s" onclick="goBack()">↩ رجوع</button>':'';h=`<div class="no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">${back}<button class="btn s" onclick="go('dash')">🏠 الرئيسية</button></div>`+h}
@@ -491,7 +509,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.68';
+const APP_VERSION='v1.69';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -596,6 +614,7 @@ async function devSetView(){
     <p class="muted">مسموح دخولهم وقت القفل: ${e(who)}</p>
     <p class="muted">ينتهي: ${e(until)}</p>
     <div class="row-btns"><button class="s" onclick="devToggleLock()">${st.locked?'تعديل القفل':'قفل الموقع'}</button>${st.locked?'<button class="s" onclick="devUnlock()">فتح الموقع</button>':''}</div></div>
+  ${await devMfaCard()}
   <div class="card"><div class="card-title"><b>خروج كل المستخدمين</b></div>
     <p class="muted">يقفل كل الجلسات الحالية، ولازم كل حد يسجل دخول تاني (وحسابك كمان).</p>
     <div class="row-btns"><button class="s" onclick="devRevokeAll()">تسجيل خروج للكل</button></div></div>
