@@ -50,7 +50,7 @@ function toast(msg){const t=$('#toast');if(!t)return;t.textContent=msg;t.classLi
 function showPlaceholder(){const pg=document.querySelector('.page');if(pg)pg.innerHTML='<div class="page-loading"><div class="pl-spin"></div><p class="muted">جاري فتح الصفحة...</p></div>'}
 function go(vw){window.ixMode={};if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();showPlaceholder();return R('soft')}
 
-const P={admin:'*',accountant:['dash','prod','cust','supp','sales','purch','po','grn','dn','pay','exp','cash','trf','ret','quo','ord','stmt','emp','prl','asset','bank','price','rep','jr','stk','period','appr','chk','comm','taxdoc','org','health','audit'],sales:['dash','prod','cust','sales','dn','ret','quo','ord','stmt','price','comm','taxdoc','appr'],store:['dash','prod','purch','po','grn','dn','ret','trf','stk','mfg']};
+const P={admin:'*',accountant:['dash','prod','cust','supp','sales','purch','po','grn','dn','pay','exp','cash','trf','ret','quo','ord','stmt','emp','prl','asset','bank','price','rep','profit','jr','stk','period','appr','chk','comm','taxdoc','org','health','audit'],sales:['dash','prod','cust','sales','dn','ret','quo','ord','stmt','price','comm','taxdoc','appr'],store:['dash','prod','purch','po','grn','dn','ret','trf','stk','mfg']};
 const canMaster=()=>!!me&&['admin','accountant','store'].includes(me.role);
 const isAdminRole=()=>!!me&&me.role==='admin';
 const DISC_MAX_PCT={sales:5};
@@ -373,8 +373,8 @@ function openMobileNav(){const s=document.querySelector('.sidebar');const o=docu
 function closeMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.remove('open');if(o)o.classList.remove('open');document.body.classList.remove('menu-open')}
 // --- Enterprise UI layer ---
 const navOld = [['dash','الرئيسية'],['prod','الأصناف'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلام المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','التحصيل والمدفوعات'],['exp','المصروفات'],['cash','الخزينة والبنوك'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','التحويلات المخزنية'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الموارد البشرية'],['prl','المرتبات'],['period','الفترات والإقفال'],['org','الفروع ومراكز التكلفة'],['trace','تتبع المخزون / MRP'],['data','استيراد وتصدير'],['appr','الاعتمادات'],['taxdoc','المستندات الضريبية'],['users','المستخدمون'],['audit','سجل العمليات'],['health','فحص الجاهزية'],['int','التكاملات'],['set','الإعدادات والإدارة']];
-const NAV2=[...navOld, ...NAV.filter(x=>['chk','jr','rep'].includes(x[0]))];
-const ROLE2={admin:'*',accountant:['dash','prod','cust','supp','sales','quo','ord','dn','ret','purch','po','grn','pay','chk','exp','cash','bank','trf','stk','price','comm','asset','hr','emp','prl','rep','jr','taxdoc','trace'],sales:['dash','prod','cust','sales','quo','ord','dn','ret','price','comm'],store:['dash','prod','po','grn','trf','stk','trace']};
+const NAV2=[...navOld, ...NAV.filter(x=>['chk','jr','rep'].includes(x[0])), ['profit','الأرباح بالتفاصيل']];
+const ROLE2={admin:'*',accountant:['dash','prod','cust','supp','sales','quo','ord','dn','ret','purch','po','grn','pay','chk','exp','cash','bank','trf','stk','price','comm','asset','hr','emp','prl','rep','profit','jr','taxdoc','trace'],sales:['dash','prod','cust','sales','quo','ord','dn','ret','price','comm'],store:['dash','prod','po','grn','trf','stk','trace']};
 P.admin='*'; P.accountant=ROLE2.accountant; P.sales=ROLE2.sales; P.store=ROLE2.store;
 NAV.splice(0,NAV.length,...NAV2);
 const HIDDEN_MODULES=new Set(['mfg','pos','proj']);
@@ -382,10 +382,10 @@ let customPermMode='role',customPerms=new Set();
 const NAV_GROUPS=[
   ['الرئيسية',['dash'],'overview'],
   ['المبيعات',['sales','ord','quo','dn','ret','cust','price','comm'],'sales'],
-  ['المشتريات',['purch','po','grn','supp'],'purch'],
+  ['المشتريات',['purch','po','grn'],'purch'],
   ['المخزون',['prod','whs','trf','stk','trace'],'inventory'],
   ['الخزينة والبنوك',['cash','bank','chk','pay','exp'],'treasury'],
-  ['المحاسبة والتقارير',['stmt','jr','rep','asset','taxdoc'],'accounting'],
+  ['المحاسبة والتقارير',['profit','stmt','jr','rep','asset','taxdoc'],'accounting'],
   ['الموظفون',['emp','hr','prl'],'hr'],
   ['الإعدادات والإدارة',['set'],'admin']
 ];
@@ -559,8 +559,97 @@ async function runHealthCheck(){return withLoading(async()=>{const box=$('#healt
 async function runEnterpriseTest(){return withLoading(async()=>{const box=$('#enterpriseTestBox');box.innerHTML='<p>جاري تشغيل الاختبار الشامل...</p>';try{const r=await rpc('run_erp_go_live_test',{});const rows=(r.results||[]).map(x=>`<div class="test-row ${x.pass?'pass':'fail'}"><span>${x.pass?'✓':'✗'}</span><b>${e(x.test)}</b><small>${e(x.detail||'')}</small></div>`).join('');box.innerHTML=`<div class="test-summary ${r.ok?'ok':'fail'}">${r.ok?'نجح الاختبار الشامل':'فشل الاختبار'}${r.cleaned?' · تم تنظيف البيانات':''}</div>${r.error?`<div class="bad">${e(r.error)}</div>`:''}${rows}`; }catch(x){box.innerHTML=`<div class="bad">${e(x.message||x)}</div>`}finally{}},'جاري اختبار النظام...','يتم تشغيل سيناريوهات الـERP')}
 async function runAdvancedInventoryTest(){return withLoading(async()=>{const box=$('#advancedTestBox');if(box)box.innerHTML='<p>جاري اختبار التتبع وMRP والاستيراد...</p>';try{const r=await rpc('run_advanced_inventory_test',{});const rows=(r.results||[]).map(x=>`<div class="test-row ${x.pass?'pass':'fail'}"><span>${x.pass?'✓':'✗'}</span><b>${e(x.test)}</b><small>${e(x.detail||'')}</small></div>`).join('');if(box)box.innerHTML=`<div class="test-summary ${r.ok?'ok':'fail'}">${r.ok?'نجح اختبار المخزون الذكي':'فشل الاختبار'}${r.cleaned?' · تم تنظيف البيانات':''}</div>${r.error?`<div class="bad">${e(r.error)}</div>`:''}${rows}`;}catch(x){if(box)box.innerHTML=`<div class="bad">${e(x.message||x)}</div>`}finally{}},'جاري اختبار المخزون...','يتم اختبار Batch / Serial / MRP')}
 
-async function reportsView(){const today=new Date().toISOString().slice(0,10);const first=today.slice(0,8)+'01';const [ca,sa,tb,bs,inv,sales,cf,pl]=await Promise.all([rpc('customer_aging',{p_as_of:today}),rpc('supplier_aging',{p_as_of:today}),rpc('trial_balance',{}),rpc('balance_sheet',{p_as_of:today}),rpc('inventory_valuation',{}),rpc('sales_by_customer',{p_from:first,p_to:today}),rpc('cashflow_summary',{p_from:first,p_to:today}),rpc('profit_loss',{p_from:first,p_to:today})]);return `${sectionHead('التقارير والتحليلات','تقارير تشغيلية ومالية من نفس مصدر البيانات.')}`+`<div class="report-cards"><div class="card"><b>ميزان المراجعة</b>${T(['الحساب','مدين','دائن','الرصيد'],tb.map(x=>[e(x.name),money(x.debit),money(x.credit),money(Math.abs(x.balance))]))}</div><div class="card"><b>المركز المالي</b>${T(['الحساب','النوع','الرصيد'],bs.map(x=>[e(x.name),x.type,money(Math.abs(x.balance))]))}</div></div>`+`<div class="report-cards"><div class="card"><b>أعمار العملاء</b>${T(['العميل','حالي','1-30','31-60','61-90','90+','الإجمالي'],ca.map(x=>[e(x.name),money(x.current_amt),money(x.d1_30),money(x.d31_60),money(x.d61_90),money(x.d90_plus),money(x.total)]))}</div><div class="card"><b>أعمار الموردين</b>${T(['المورد','حالي','1-30','31-60','61-90','90+','الإجمالي'],sa.map(x=>[e(x.name),money(x.current_amt),money(x.d1_30),money(x.d31_60),money(x.d61_90),money(x.d90_plus),money(x.total)]))}</div></div>`+`<div class="report-cards"><div class="card"><b>تقييم المخزون</b>${T(['الصنف','الكمية','التكلفة','القيمة'],inv.slice(0,100).map(x=>[e(x.product_name),fmt(x.qty),money(x.avg_cost),money(x.value)]))}</div><div class="card"><b>التدفق النقدي</b>${T(['داخل','خارج','صافي'],cf.map(x=>[money(x.inflow),money(x.outflow),money(x.net)]))}</div></div>`+`<div class="card"><b>قائمة الدخل / الأرباح والخسائر</b>${pl.length?T(['البند','القيمة'],pl.map(x=>[e(x.metric||x.name||x.label),money(x.value??x.amount??x.total)])):'<div class="empty">لا توجد بيانات للفترة الحالية.</div>'}</div>`}
+async function reportsView(){const today=new Date().toISOString().slice(0,10);const first=today.slice(0,8)+'01';const [ca,sa,tb,bs,inv,sales,cf,pl]=await Promise.all([rpc('customer_aging',{p_as_of:today}),rpc('supplier_aging',{p_as_of:today}),rpc('trial_balance',{}),rpc('balance_sheet',{p_as_of:today}),rpc('inventory_valuation',{}),rpc('sales_by_customer',{p_from:first,p_to:today}),rpc('cashflow_summary',{p_from:first,p_to:today}),rpc('profit_loss',{p_from:first,p_to:today})]);return `${sectionHead('التقارير والتحليلات','تقارير تشغيلية ومالية من نفس مصدر البيانات.')}`+`<div class="report-cards"><div class="card"><b>ميزان المراجعة</b>${T(['الحساب','مدين','دائن','الرصيد'],tb.map(x=>[e(x.name),money(x.debit),money(x.credit),money(Math.abs(x.balance))]))}</div><div class="card"><b>المركز المالي</b>${T(['الحساب','النوع','الرصيد'],bs.map(x=>[e(x.name),x.type,money(Math.abs(x.balance))]))}</div></div>`+`<div class="report-cards"><div class="card"><b>أعمار العملاء</b>${T(['العميل','حالي','1-30','31-60','61-90','90+','الإجمالي'],ca.map(x=>[e(x.name),money(x.current_amt),money(x.d1_30),money(x.d31_60),money(x.d61_90),money(x.d90_plus),money(x.total)]))}</div><div class="card"><b>أعمار الموردين</b>${T(['المورد','حالي','1-30','31-60','61-90','90+','الإجمالي'],sa.map(x=>[e(x.name),money(x.current_amt),money(x.d1_30),money(x.d31_60),money(x.d61_90),money(x.d90_plus),money(x.total)]))}</div></div>`+`<div class="report-cards"><div class="card"><b>تقييم المخزون</b>${T(['الصنف','الكمية','التكلفة','القيمة'],inv.slice(0,100).map(x=>[e(x.product_name),fmt(x.qty),money(x.avg_cost),money(x.value)]))}</div><div class="card"><b>التدفق النقدي</b>${T(['داخل','خارج','صافي'],cf.map(x=>[money(x.inflow),money(x.outflow),money(x.net)]))}</div></div>`+`<div class="card"><b>قائمة الدخل / الأرباح والخسائر</b>${pl.length?T(['البند','القيمة'],pl.map(x=>[e(x.account_name||x.metric||x.name||x.label||''),money(x.amount??x.value??x.total)])):'<div class="empty">لا توجد بيانات للفترة الحالية.</div>'}</div>`}
 
+
+// ===== الأرباح بالتفاصيل (v1.82) =====
+let PF={p:'month',from:'',to:''};
+const pfFmtD=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+function pfRange(){const t=new Date(),y=t.getFullYear(),m=t.getMonth();
+  switch(PF.p){
+    case 'today':return[pfFmtD(t),pfFmtD(t)];
+    case 'week':{const s=new Date(t);s.setDate(t.getDate()-6);return[pfFmtD(s),pfFmtD(t)]}
+    case 'lastmonth':return[pfFmtD(new Date(y,m-1,1)),pfFmtD(new Date(y,m,0))];
+    case 'year':return[pfFmtD(new Date(y,0,1)),pfFmtD(t)];
+    case 'custom':return[PF.from||pfFmtD(new Date(y,m,1)),PF.to||pfFmtD(t)];
+    default:return[pfFmtD(new Date(y,m,1)),pfFmtD(t)];
+  }}
+async function pfLoad(from,to){
+  const [items,rets,exps,pays]=await Promise.all([
+    sb.from('sales_invoice_items').select('invoice_id,product_id,qty,line_total,unit_cost,products(name),sales_invoices!inner(date,status)').eq('sales_invoices.status','Posted').gte('sales_invoices.date',from).lte('sales_invoices.date',to),
+    sb.from('sales_return_items').select('return_id,product_id,qty,line_total,products(name),sales_returns!inner(date,invoice_id)').gte('sales_returns.date',from).lte('sales_returns.date',to),
+    sb.from('expenses').select('category,amount,date').gte('date',from).lte('date',to),
+    sb.from('payroll').select('net,month').gte('month',from.slice(0,8)+'01').lte('month',to)
+  ]);
+  for(const r of [items,rets,exps,pays]) if(r.error) throw r.error;
+  const R_rets=rets.data||[];
+  const invIds=[...new Set(R_rets.map(x=>x.sales_returns?.invoice_id).filter(Boolean))];
+  const costMap=new Map();
+  if(invIds.length){const c=await sb.from('sales_invoice_items').select('invoice_id,product_id,unit_cost').in('invoice_id',invIds);if(c.error)throw c.error;(c.data||[]).forEach(x=>costMap.set(x.invoice_id+'|'+x.product_id,+x.unit_cost||0))}
+  return {items:items.data||[],rets:R_rets,exps:exps.data||[],pays:pays.data||[],costMap};
+}
+function pfCalc(D){
+  const prod=new Map(), day=new Map();
+  const P=(pid,name)=>{if(!prod.has(pid))prod.set(pid,{name:name||'—',qty:0,sales:0,cost:0});const p=prod.get(pid);if(name&&p.name==='—')p.name=name;return p};
+  const Dd=(d)=>{if(!day.has(d))day.set(d,{p:0});return day.get(d)};
+  let sales=0,cogs=0,retS=0,retC=0;
+  for(const x of D.items){
+    const s=+x.line_total||0, c=(+x.qty||0)*(+x.unit_cost||0);
+    sales+=s; cogs+=c;
+    const p=P(x.product_id,x.products?.name); p.qty+=+x.qty||0; p.sales+=s; p.cost+=c;
+    const d=x.sales_invoices?.date; if(d) Dd(d).p+=s-c;
+  }
+  for(const x of D.rets){
+    const s=+x.line_total||0, c=(+x.qty||0)*(D.costMap.get(x.sales_returns?.invoice_id+'|'+x.product_id)||0);
+    retS+=s; retC+=c;
+    const p=P(x.product_id,x.products?.name); p.qty-=+x.qty||0; p.sales-=s; p.cost-=c;
+    const d=x.sales_returns?.date; if(d) Dd(d).p-=(s-c);
+  }
+  const netS=sales-retS, netC=cogs-retC, gp=netS-netC;
+  const expCat=new Map(); let expTotal=0;
+  for(const x of D.exps){const a=+x.amount||0;expTotal+=a;const k=x.category||'غير مصنف';expCat.set(k,(expCat.get(k)||0)+a)}
+  const payTotal=D.pays.reduce((t,x)=>t+(+x.net||0),0);
+  const beforePay=gp-expTotal, np=beforePay-payTotal;
+  return {sales,retS,netS,cogs,retC,netC,gp,expTotal,expCat,payTotal,beforePay,np,prod,day};
+}
+async function profitView(){
+  const [from,to]=pfRange();
+  const D=await pfLoad(from,to), C=pfCalc(D);
+  const pc=(x,base)=>base>0?`${(x/base*100).toFixed(1)}%`:'—';
+  const presets=[['today','اليوم'],['week','آخر 7 أيام'],['month','هذا الشهر'],['lastmonth','الشهر اللي فات'],['year','هذه السنة'],['custom','فترة مخصصة']];
+  const rows=[
+    ['إجمالي المبيعات',C.sales,'',''],
+    ['مرتجعات المبيعات',-C.retS,'',''],
+    ['صافي المبيعات',C.netS,'b',pc(C.netS,C.netS)],
+    ['تكلفة البضاعة المباعة',-C.netC,'',pc(C.netC,C.netS)],
+    ['مجمل الربح',C.gp,'b',pc(C.gp,C.netS)],
+    ['المصروفات',-C.expTotal,'',pc(C.expTotal,C.netS)],
+    ['الربح بعد المصروفات',C.beforePay,'b',pc(C.beforePay,C.netS)],
+    ['المرتبات (حسب الشهر)',-C.payTotal,'',pc(C.payTotal,C.netS)],
+    ['صافي الربح',C.np,'big',pc(C.np,C.netS)]
+  ];
+  const list=rows.map(([l,v,k,p])=>`<div class="pf-row ${k}"><span>${l}</span><b>${money(v)}</b><em>${p}</em></div>`).join('');
+  const prods=[...C.prod.entries()].map(([id,p])=>({id,...p,profit:p.sales-p.cost})).filter(p=>p.qty!==0||p.sales!==0).sort((a,b)=>b.profit-a.profit);
+  const days=[...C.day.entries()].sort((a,b)=>a[0]<b[0]?-1:1).slice(-62);
+  const maxAbs=Math.max(1,...days.map(([,v])=>Math.abs(v.p)));
+  const bars=days.length?`<div class="pf-bars">${days.map(([d,v])=>`<div class="pf-bar" title="${d}"><i class="${v.p<0?'neg':''}" style="height:${Math.max(4,Math.round(Math.abs(v.p)/maxAbs*100))}%"></i><small>${d.slice(8)}</small></div>`).join('')}</div>`:'<div class="empty">لا توجد مبيعات في الفترة.</div>';
+  const expRows=[...C.expCat.entries()].sort((a,b)=>b[1]-a[1]).map(([k,v])=>[e(k),money(v),pc(v,C.expTotal)]);
+  const isEmpty=!D.items.length&&!D.exps.length&&!D.pays.length;
+  return sectionHead('الأرباح بالتفاصيل','احسب الربح لأي فترة: مبيعات، مرتجعات، تكلفة، مصروفات، ومرتبات.')+
+  `<div class="card np pf-top"><div class="hm-seg">${presets.map(([k,l])=>`<button class="hm-sb ${PF.p===k?'on':''}" onclick="PF.p='${k}';R()">${l}</button>`).join('')}</div>${PF.p==='custom'?`<div class="hm-dates"><input type="date" value="${from}" onchange="PF.from=this.value;R()"><input type="date" value="${to}" onchange="PF.to=this.value;R()"></div>`:`<span class="muted">من ${from} إلى ${to}</span>`}</div>`+
+  `<div class="pf-kpis">
+     <div class="pf-k k-blue"><small>صافي المبيعات</small><b>${fmt(C.netS)}</b></div>
+     <div class="pf-k k-green"><small>مجمل الربح</small><b>${fmt(C.gp)}</b><em>${pc(C.gp,C.netS)} هامش</em></div>
+     <div class="pf-k k-orange"><small>المصروفات + المرتبات</small><b>${fmt(C.expTotal+C.payTotal)}</b></div>
+     <div class="pf-k ${C.np>=0?'k-green':'k-red'}"><small>صافي الربح</small><b>${fmt(C.np)}</b><em>${pc(C.np,C.netS)} هامش</em></div>
+   </div>`+
+  (isEmpty?`<div class="card"><div class="empty">لا توجد حركات في هذه الفترة.</div></div>`:'')+
+  `<div class="pf-grid"><div class="card"><div class="card-title"><b>قائمة الربح</b></div><div class="pf-list">${list}</div></div>
+   <div class="card"><div class="card-title"><b>الربح اليومي</b><span class="muted">آخر ${days.length} يوم بمبيعات</span></div>${bars}</div></div>`+
+  `<div class="pf-grid"><div class="card"><div class="card-title"><b>الأصناف حسب الربح</b><span class="muted">${prods.length} صنف</span></div>${prods.length?T(['الصنف','الكمية','المبيعات','التكلفة','الربح','الهامش'],prods.slice(0,100).map(p=>[e(p.name),fmt(p.qty),money(p.sales),money(p.cost),money(p.profit),pc(p.profit,p.sales)])):'<div class="empty">لا توجد أصناف مباعة.</div>'}</div>
+   <div class="card"><div class="card-title"><b>المصروفات حسب البند</b></div>${expRows.length?T(['البند','المبلغ','النسبة'],expRows):'<div class="empty">لا توجد مصروفات في الفترة.</div>'}</div></div>`+
+  `<p class="muted pf-note">الأرقام من فواتير البيع المرحّلة، ومرتجعات البيع، والمصروفات، ومرتبات الأشهر داخل الفترة. الضريبة مش داخلة في الربح. تكلفة المرتجع محسوبة بتكلفة الصنف وقت البيع.</p>`;
+}
 
 // Override dashboard test to call the enterprise suite.
 const PERMISSION_GROUPS=[
@@ -632,7 +721,7 @@ async function paintView(q){
     if(view==='dash')h=await dash(); else if(view==='po')h=await poView(); else if(view==='grn')h=await grnView(); else if(view==='dn')h=await dnView();
     else if(view==='asset')h=await assetView(); else if(view==='bank')h=await bankView(); else if(view==='price')h=await priceView();
     else if(view==='hr')h=await hrView(); else if(view==='mfg')h=await mfgView(); else if(view==='pos')h=await posView(); else if(view==='proj')h=await projView(); else if(view==='period')h=await periodView();
-    else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='devset')h=await devSetView(); else if(view==='rep')h=await reportsView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
+    else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='devset')h=await devSetView(); else if(view==='rep')h=await reportsView(); else if(view==='profit')h=await profitView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
     else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else if(view==='cosettings')h=await coSettingsView(); else if(view==='printcfg')h=await printSettingsView(); else if(view==='fullbak')h=fullBakView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
     if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
@@ -648,7 +737,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.81';
+const APP_VERSION='v1.82';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
