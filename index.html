@@ -313,6 +313,7 @@ function fullBakView(){
     <div id="fbSummary"></div></div>`:''}`;
 }
 async function fbBackup(){
+  try{
   const p=v('fb_p1')||'';
   if(p.length<8)return toast('الباسورد لازم يكون 8 حروف على الأقل');
   if(p!==(v('fb_p2')||''))return toast('الباسورد مش متطابق في الخانتين');
@@ -321,9 +322,11 @@ async function fbBackup(){
     fbDownload(await fbEncrypt(data,p),'erp_full_backup_'+new Date().toISOString().slice(0,10)+'.erpbak');
     toast('اتنزلت النسخة الكاملة');
   },'جاري تجهيز النسخة الكاملة...','ممكن ياخد وقت لو ملفات الـ Storage كبيرة');
+  }catch(x){alert('تعذر تنفيذ العملية: '+(x&&x.message?x.message:x));console.error(x)}
 }
 let fbRestoreData=null,fbRestorePass='',fbCheckInfo=null;
 async function fbPrepare(){
+  try{
   if(!me||!me.isDev)return;
   const f=document.getElementById('fb_file')?.files?.[0];const pass=v('fb_rp')||'';
   if(!f)return toast('اختار ملف النسخة الأول');
@@ -335,6 +338,7 @@ async function fbPrepare(){
     fbRestoreData=data;fbRestorePass=pass;fbCheckInfo=st;
     fbShowSummary(data,st);
   },'جاري فحص الملف...','بنفك التشفير ونتأكد من الداتا الحالية');
+  }catch(x){alert('تعذر تنفيذ العملية: '+(x&&x.message?x.message:x));console.error(x)}
 }
 function fbShowSummary(data,st){
   const pub=data.public||{};
@@ -348,6 +352,7 @@ function fbShowSummary(data,st){
   document.getElementById('fbSummary').innerHTML=`<div class="card"><b>ملخص النسخة</b><p class="muted">تاريخ النسخة: ${e(new Date(data.created_at).toLocaleString('ar-EG'))}</p><p>جداول فيها داتا: ${tabs} · صفوف: ${rows} · مستخدمين: ${users} · ملفات: ${files}</p></div>${warn}<div class="row-btns"><button class="btn" onclick="fbRunRestore()">بدء الاستعادة</button></div>`;
 }
 async function fbRunRestore(){
+  try{
   if(!fbRestoreData||!fbCheckInfo)return;
   if(fbCheckInfo.hasData&&(v('fb_confirm')||'')!=='استعادة')return toast('اكتب كلمة "استعادة" بالظبط عشان تكمل');
   if(!confirm('أكيد؟ الاستعادة هتكتب فوق البيانات الحالية. كل المستخدمين هيتقفلوا، ولازم كل حد يسجل دخول تاني بالباسورد من النسخة.'))return;
@@ -362,6 +367,7 @@ async function fbRunRestore(){
     document.getElementById('fbSummary').innerHTML=`<div class="card"><b class="good">تمت الاستعادة</b><p>الملفات اللي اترفعت: ${r.filesUploaded||0}${errs.length?` · فشل: ${errs.length}`:''}</p>${errs.length?`<details><summary>تفاصيل الفشل</summary><pre>${errs.map(x=>e(x)).join('\n')}</pre></details>`:''}<p class="muted">الجلسات اتقفلت، هنخرجك دلوقتي وتسجل دخول تاني.</p></div>`;
     setTimeout(async()=>{try{await sb.auth.signOut()}catch(_){}location.reload()},5000);
   },'جاري الاستعادة...','متقفلش الصفحة لحد ما تخلص');
+  }catch(x){alert('تعذر تنفيذ العملية: '+(x&&x.message?x.message:x));console.error(x)}
 }
 async function runSmokeTest(){const box=$('#smokeResult');if(box)box.innerHTML='<p>جاري الاختبار...</p>';try{const r=await rpc('run_erp_smoke_test',{});const show=z=>typeof z==='object'&&z!==null?JSON.stringify(z):String(z??'');const rows=(r.results||[]).map(x=>{const p=x.pass?'✓':'✗';const vals=Object.entries(x).filter(([k])=>!['test','pass'].includes(k)).map(([k,v])=>`${e(k)}=${e(show(v))}`).join(' | ');return`<div class="${x.pass?'good':'bad'}">${p} ${e(x.test)}${vals?' — '+vals:''}</div>`}).join('');if(box)box.innerHTML=`<div class="card"><b class="${r.ok?'good':'bad'}">${r.ok?'نجح اختبار النظام بالكامل':'فشل اختبار النظام'}</b>${rows}<p>تم تنظيف بيانات الاختبار: ${r.cleaned?'نعم':'لا'}</p></div>`}catch(x){if(box)box.innerHTML=`<div class="card bad">فشل تشغيل الاختبار: ${e(x.message||x)}</div>`}}
 function openMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.add('open');if(o)o.classList.add('open');document.body.classList.add('menu-open')}
@@ -584,7 +590,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.69';
+const APP_VERSION='v1.70';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
