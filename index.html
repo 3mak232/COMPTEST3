@@ -263,7 +263,7 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.role==='admin'?settingsLink('int','التكاملات','إدارة الاتصالات والتكاملات الخارجية.','↔'):''}
   ${me.role==='admin'?settingsLink('audit','سجل العمليات','مراجعة العمليات والتغييرات.','⌁'):''}
   ${me.isDev?settingsLink('health','فحص الجاهزية','فحوصات الصحة وGo-Live.','♥'):''}
-  <button class="settings-tile" onclick="toggleDialect()"><span class="settings-icon">ع</span><span><b>أسلوب الكلام: ${dialectMode()==='msa'?'فصحى':'عامية مصرية'}</b><small>اضغط عشان تبدّل بين العامية المصرية والفصحى (التبديل ده على الجهاز ده).</small></span><span class="settings-arrow">‹</span></button>
+  <button class="settings-tile" onclick="toggleDialect()"><span class="settings-icon">ع</span><span><b>اللغة وأسلوب الكلام: ${({eg:'عامية مصرية',msa:'فصحى',en:'English'})[dialectMode()]||'عامية مصرية'}</b><small>اضغط عشان تبدّل بين العامية المصرية والفصحى (التبديل ده على الجهاز ده).</small></span><span class="settings-arrow">‹</span></button>
   ${me.isDev?'<button class="settings-tile" onclick="go(\'devset\')"><span class="settings-icon">⚙</span><span><b>إعدادات المطور</b><small>قفل الموقع وفتحه، خروج كل الجلسات، تحديث الواجهة، والفحوصات.</small></span><span class="settings-arrow">‹</span></button>':''}
 
 </div>
@@ -485,13 +485,13 @@ async function paintView(q){
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
   const viewChanged=window._animView!==view;window._animView=view;
   if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){const pg=$('.page');if(window._lastLinks!==links){$('nav').innerHTML=links;window._lastLinks=links}pg.innerHTML=h;if(viewChanged){pg.classList.remove('pg-in');void pg.offsetWidth;pg.classList.add('pg-in')}$('.mobile-bottom').innerHTML=bottomNav()}
-  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.isDev?'مطور':me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search"><span>⌕</span><input placeholder="بحث سريع في النظام" onkeydown="if(event.key==='Enter'){window._q=this.value;go('prod')}"/></div><div class="top-actions"><div id="netStatus"></div><span class="ver-pill" title="رقم الإصدار">${APP_VERSION}</span>${me.isDev?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
+  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.isDev?'مطور':me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search" style="position:relative"><span>⌕</span><input id="gs" autocomplete="off" placeholder="بحث سريع في النظام" oninput="gsSearch(this.value)" onkeydown="gsKey(event)"/><div id="gsRes" hidden style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card,#fff);color:var(--fg,#111);border:1px solid rgba(128,128,128,.25);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:999;max-height:60vh;overflow:auto;padding:6px;text-align:start"></div></div><div class="top-actions"><div id="netStatus"></div><button class="iconbtn" title="اللغة وأسلوب الكلام" onclick="toggleDialect()">🌐</button><span class="ver-pill" title="رقم الإصدار">${APP_VERSION}</span>${me.isDev?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
   if(q){const i=$('#q');if(i){i.focus();i.setSelectionRange(99,99)}}
   updateOnlineStatus();
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.63';
+const APP_VERSION='v1.64';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -620,6 +620,50 @@ function resetIdle(){
 }
 ['mousemove','keydown','pointerdown','touchstart','scroll'].forEach(ev=>document.addEventListener(ev,resetIdle,{passive:true}));
 setTimeout(resetIdle,0);
+
+// ----- البحث الشامل من الشريط العلوي (v1.64) -----
+let _gsT=null, _gsList=[];
+const gsBox=()=>document.getElementById('gsRes');
+function gsHide(){const b=gsBox();if(b){b.hidden=true;b.innerHTML=''}}
+function gsSearch(q){
+  clearTimeout(_gsT);
+  q=(q||'').trim();
+  if(q.length<2){gsHide();return}
+  _gsT=setTimeout(()=>gsRun(q),200);
+}
+async function gsRun(q){
+  const ql=q.toLowerCase();
+  const hit=x=>[x.name,x.code,x.barcode,x.phone,x.email].filter(Boolean).join(' ').toLowerCase().includes(ql);
+  const out=[];
+  const add=(title,items,mk)=>{if(items.length)out.push([title,items.map(mk)])};
+  if(C&&can('prod'))add('الأصناف',(C.products||[]).filter(hit).slice(0,5),x=>({label:x.name,sub:x.code||x.barcode||'',view:'prod',term:x.name}));
+  if(C&&can('cust'))add('العملاء',(C.customers||[]).filter(hit).slice(0,5),x=>({label:x.name,sub:x.phone||'',view:'cust',term:x.name}));
+  if(C&&can('supp'))add('الموردون',(C.suppliers||[]).filter(hit).slice(0,5),x=>({label:x.name,sub:x.phone||'',view:'supp',term:x.name}));
+  try{
+    if(can('sales')){const r=await sb.from('sales_invoices').select('id,number').ilike('number','%'+q+'%').limit(5);if(!r.error)add('فواتير البيع',r.data||[],x=>({label:x.number,sub:'',view:'sales',term:x.number}))}
+    if(can('purch')){const r=await sb.from('purchase_invoices').select('id,number').ilike('number','%'+q+'%').limit(5);if(!r.error)add('فواتير الشراء',r.data||[],x=>({label:x.number,sub:'',view:'purch',term:x.number}))}
+  }catch{}
+  _gsList=[];
+  const b=gsBox(); if(!b)return;
+  if(!out.length){b.hidden=false;b.innerHTML='<div style="padding:10px;opacity:.7">مفيش نتايج</div>';return}
+  b.hidden=false;
+  b.innerHTML=out.map(([t,rows])=>`<div style="font-size:12px;opacity:.7;padding:6px 8px">${e(t)}</div>`+rows.map(r=>{
+    const i=_gsList.push(r)-1;
+    return `<button onmousedown="event.preventDefault()" onclick="gsGo(${i})" style="display:flex;width:100%;justify-content:space-between;gap:10px;text-align:start;background:transparent;border:0;padding:8px 10px;border-radius:8px;cursor:pointer;color:inherit"><b>${e(r.label)}</b><small style="opacity:.7">${e(r.sub)}</small></button>`;
+  }).join('')).join('');
+}
+function gsGo(i){
+  const r=_gsList[i]; if(!r)return;
+  gsHide();
+  const inp=document.getElementById('gs'); if(inp)inp.value='';
+  window._q=r.term||'';
+  go(r.view);
+}
+function gsKey(ev){
+  if(ev.key==='Escape'){gsHide();return}
+  if(ev.key==='Enter'&&_gsList.length){ev.preventDefault();gsGo(0)}
+}
+document.addEventListener('click',ev=>{if(!ev.target.closest('.top-search'))gsHide()});
 async function boot(){const{data:{user}}=await sb.auth.getUser();
   if(await lockGate(!!user))return;me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMobileNav()});
@@ -1936,10 +1980,23 @@ const DX_PAIRS=[
   ['اتقفل','أُغلق'],['اتقفلت','أُغلقت'],['اتحذف','حُذف'],['اتسجل','سُجّل'],['اتسجلت','سُجّلت'],['اتعطل','تعطّل'],
 ];
 DX_PAIRS.sort((a,b)=>b[0].length-a[0].length);
+// ----- ترجمة الإنجليزي (المرحلة الأولى: القوايم والأزرار والعناوين) -----
+const EN_PAIRS=[
+['الرئيسية','Home'],['المنتجات','Products'],['الأطراف','Parties'],['الموردون','Suppliers'],['المبيعات','Sales'],['أذونات التسليم','Delivery Notes'],['المشتريات','Purchases'],['أوامر الشراء','Purchase Orders'],['استلامات المشتريات','Goods Receipts'],['المرتجعات','Returns'],['عروض الأسعار','Quotations'],['أوامر البيع','Sales Orders'],['كشف الحساب','Statement'],['المدفوعات','Payments'],['المصروفات','Expenses'],['الخزينة','Cash'],['البنوك والتسويات','Banks & Reconciliation'],['المخازن','Warehouses'],['تحويل مخزني','Stock Transfer'],['الجرد','Stocktake'],['قوائم الأسعار','Price Lists'],['العمولات','Commissions'],['الأصول الثابتة','Fixed Assets'],['الموظفون','Employees'],['الحضور والإجازات','Attendance & Leave'],['المرتبات','Payroll'],['التصنيع','Manufacturing'],['نقطة البيع','Point of Sale'],['المشروعات والخدمات','Projects & Services'],['الفروع ومراكز التكلفة','Branches & Cost Centers'],['الفترات المالية','Fiscal Periods'],['الاعتمادات','Approvals'],['الشيكات','Cheques'],['المستندات الضريبية','Tax Documents'],['التكاملات','Integrations'],['التقارير','Reports'],['الحسابات','Accounts'],['فحص الجاهزية','Health Check'],['المستخدمون','Users'],['سجل العمليات','Audit Log'],['الإعدادات','Settings'],['إعدادات المطور','Developer Settings'],['بحث سريع في النظام','Quick search'],
+['تسجيل الدخول','Sign in'],['تسجيل خروج','Sign out'],['إضافة','Add'],['تعديل','Edit'],['حذف','Delete'],['حفظ','Save'],['إلغاء','Cancel'],['طباعة','Print'],['تحديث','Update'],['تأكيد','Confirm'],['بحث','Search'],['فتح','Open'],['إغلاق','Close'],['تطبيق','Apply'],['رجوع','Back'],['تصدير','Export'],['استيراد','Import'],['نسخة احتياطية','Backup'],
+['فاتورة بيع','Sales invoice'],['فاتورة شراء','Purchase invoice'],['مرتجع بيع','Sales return'],['مرتجع شراء','Purchase return'],
+['الإجمالي','Total'],['الرصيد','Balance'],['التاريخ','Date'],['الاسم','Name'],['الكود','Code'],['الباركود','Barcode'],['المخزون','Stock'],['التكلفة','Cost'],['السعر','Price'],['الكمية','Quantity'],['رقم الفاتورة','Invoice No.'],['المبلغ','Amount'],['العميل','Customer'],['المورد','Supplier'],['الصنف','Item'],['الفرع','Branch'],['المخزن','Warehouse'],['الحساب','Account'],['الخصم','Discount'],['الضريبة','Tax'],['الحالة','Status'],['ملاحظات','Notes'],['الوصف','Description'],['الهاتف','Phone'],['البريد','Email'],['الدور','Role'],['مفعّل','Active'],['الصلاحيات','Permissions'],
+['لوحة التحكم','Dashboard'],['الربح الإجمالي','Gross profit'],['الربح المبدئي','Gross profit'],['المبيعات اليوم','Today sales'],['هذا الشهر','This month'],['اليوم','Today'],['آخر 7 أيام','Last 7 days'],['هذا العام','This year'],
+['مرحباً','Welcome'],['مرحبًا','Welcome'],['مركز موحّد لإدارة المبيعات والمشتريات والمخزون والمحاسبة.','Unified center for sales, purchases, inventory and accounting.'],
+['فاتورة مبيعات سريعة','Quick sale invoice'],['تحويل المخزن','Warehouse transfer'],
+];
+EN_PAIRS.sort((a,b)=>b[0].length-a[0].length);
+
 function dialectMode(){try{return localStorage.getItem('erp_dialect')||'eg'}catch{return 'eg'}}
 // ترجمة نص واحد حسب الأسلوب المختار
 function dx(s){
   if(typeof s!=='string')return s;
+  if(dialectMode()==='en'){let o=s;for(const [ar,en] of EN_PAIRS){if(o.includes(ar))o=o.split(ar).join(en)}return o}
   const msa=dialectMode()==='msa';
   let out=s;
   for(const [eg,ms] of DX_PAIRS){
@@ -1959,10 +2016,16 @@ function applyDialect(root){
   }
 }
 function toggleDialect(){
-  const next=dialectMode()==='msa'?'eg':'msa';
-  try{localStorage.setItem('erp_dialect',next)}catch{}
-  applyDialect(document.getElementById('app'));
-  if(typeof R==='function')R('soft');
+  const cur=dialectMode();
+  const opts=[['eg','عامية مصرية'],['msa','فصحى'],['en','English']];
+  formModal('اللغة وأسلوب الكلام',
+    `<div class="fm-f"><span>اختار اللغة اللي تريحك. التغيير ده على الجهاز ده بس.</span>${opts.map(([k,l])=>`<label style="display:block;margin:8px 0"><input type="radio" name="lang" value="${k}" ${cur===k?'checked':''}> ${l}</label>`).join('')}</div>`,
+    async()=>{
+      const x=document.querySelector('input[name=lang]:checked')?.value||'eg';
+      try{localStorage.setItem('erp_dialect',x)}catch{}
+      await R();
+      applyDialect(document.getElementById('app'));
+    },'حفظ');
 }
 // الرسايل المنبثقة والتوست بتتترجم كمان
 const _toastDx=toast;
