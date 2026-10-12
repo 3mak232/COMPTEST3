@@ -599,3 +599,39 @@ body{background:#f4f6fa}
 .lg-note{margin:22px 0 0;font-size:12.5px;color:var(--muted);text-align:center}
 @media(max-width:900px){.lg-wrap{grid-template-columns:1fr}.lg-brand{padding:26px 22px 30px;gap:18px}.lg-brand-mid{margin:0}.lg-brand-mid h1{font-size:25px;margin-bottom:8px}.lg-brand-mid>p{font-size:14px;margin-bottom:0}.lg-feats,.lg-brand-foot{display:none}.lg-card{padding:28px 20px 40px;box-shadow:none}}
 @media(max-width:430px){.lg-head h2{font-size:25px}.lg-brand-mid h1{font-size:22px}}
+
+/* ===== v1.79: تحسينات الموبايل + صفحة الإعدادات ===== */
+.st-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.st-group{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 10px 26px rgba(16,24,40,.05);min-width:0;--ic-bg:#eef2ff;--ic-fg:#4338ca}
+.st-group.st-g-team{--ic-bg:#ecfdf3;--ic-fg:#15803d}
+.st-group.st-g-data{--ic-bg:#fff7ed;--ic-fg:#c2410c}
+.st-group.st-g-acc{--ic-bg:#f0f9ff;--ic-fg:#0369a1}
+.st-group.st-g-dev{--ic-bg:#fdf2f8;--ic-fg:#be185d}
+.st-group h3{margin:12px 14px 4px;font-size:12px;letter-spacing:.02em;color:var(--muted);font-weight:800}
+.st-list{display:flex;flex-direction:column}
+.st-row{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;padding:12px;border-radius:14px;cursor:pointer;text-align:start;color:var(--ink);min-height:62px;font-family:inherit;transition:background .15s}
+.st-row:hover,.st-row:focus-visible{background:#f5f7fb}
+.st-row:active{background:#eef2f7}
+.st-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--ic-bg);color:var(--ic-fg);font-size:17px;flex:0 0 auto}
+.st-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.st-tx b{font-size:14.5px;font-weight:700;overflow-wrap:anywhere}
+.st-tx small{color:var(--muted);font-size:12px;line-height:1.5;margin-top:2px}
+.st-ch{color:#98a2b3;font-size:20px;flex:0 0 auto}
+/* الجداول: على الموبايل كل صف بيبقى كارت */
+.tk-l{display:none}
+@media(max-width:780px){
+  .st-wrap{grid-template-columns:minmax(0,1fr);gap:12px}
+  .st-group{border-radius:16px}
+  .st-row{min-height:66px;padding:12px 10px}
+  .st-group h3{font-size:11.5px;margin-top:10px}
+  .tw-stack{border:0;background:transparent;overflow:visible;box-shadow:none}
+  .tw-stack table{min-width:0;background:transparent}
+  .tw-stack tr:has(th){display:none}
+  .tw-stack tr{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .tw-stack td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;border-bottom:1px dashed #eef2f6;padding:8px 0;white-space:normal;text-align:start}
+  .tw-stack td:last-child{border-bottom:0}
+  .tw-stack td .tk-l{display:block;color:var(--muted);font-size:12px;font-weight:700;flex:0 0 auto;max-width:44%}
+  .tw-stack td .tk-v{min-width:0;text-align:end;overflow-wrap:anywhere;font-weight:600}
+  .tw-stack td .tk-v:empty{display:none}
+  .tw-stack td .tk-v button{min-height:40px}
+}

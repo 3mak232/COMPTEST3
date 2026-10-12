@@ -61,7 +61,7 @@ const rpc=async(f,a={})=>{const{data,error}=await sb.rpc(f,a);if(error)throw err
 const ins=async(t,o)=>{const{data,error}=await sb.from(t).insert(o).select().single();if(error)throw error;return data};
 const upd=async(t,id,o)=>{const{error}=await sb.from(t).update(o).eq('id',id);if(error)throw error};
 const g=async(t,o,sel='*')=>{let q=sb.from(t).select(sel);if(o)q=q.order(o);const{data,error}=await q;if(error)throw error;return data||[]};
-const T=(h,r)=>`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(y=>`<td>${y}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const T=(h,r)=>`<div class="tw tw-stack"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map((y,i)=>`<td><span class="tk-l">${h[i]??''}</span><span class="tk-v">${y}</span></td>`).join('')}</tr>`).join('')}</table></div>`;
 const O=a=>(a||[]).map(x=>`<option value="${x.id}">${e(x.name)}</option>`).join('');
 const by=(a,i)=>a.find(x=>x.id==i)||{}; const stkQty=p=>C.stock.filter(s=>s.product_id==p).reduce((a,s)=>a+ +s.qty,0);
 const stkQtyWh=(p,w)=>C.stock.filter(s=>s.product_id==p&&s.warehouse_id==w).reduce((a,s)=>a+ +s.qty,0);
@@ -254,24 +254,19 @@ async function quotationsView(){const L=await g('quotations','date'),tot=cart.q.
 async function ordersView(){const L=await g('sales_orders','date');return `<h2>أوامر البيع</h2><div class="card np"><select id="oa">${O(C.accts)}</select><input id="op" type="number" placeholder="المدفوع عند التحويل"></div><div class="card">${T(['رقم','التاريخ','العميل','الحالة',''],L.reverse().map(x=>[e(x.number),x.date,e(by(C.customers,x.customer_id).name),x.status,x.status==='Confirmed'?`<button onclick="act(()=>rpc('order_to_invoice',{p_order:'${x.id}',p_paid:n('op'),p_account:n('op')>0?v('oa'):null,p_method:n('op')>0?'cash':'credit'}))">تحويل لفاتورة</button> <button class="s" onclick="act(()=>rpc('cancel_order',{p_order:'${x.id}'}))">إلغاء</button>`:'']))}</div>`}
 async function usersView(){const L=await g('profiles','created_at');return `<h2>المستخدمون</h2><div class="card">${T(['الاسم','البريد','الدور','مفعّل'],L.map(u=>[e(u.name),e(u.username),`<select onchange="act(()=>upd('profiles','${u.id}',{role:this.value}))">${['admin','accountant','sales','store'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select>`,`<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`]))}</div>`}
 function settingsLink(id,title,desc,icon='⚙'){return can(id)?`<button class="settings-tile" onclick="go('${id}')"><span class="settings-icon">${icon}</span><span><b>${title}</b><small>${desc}</small></span><span class="settings-arrow">‹</span></button>`:''}
-async function settingsView(){const{data:s,error}=await sb.from('company_settings').select('*').single();if(error)throw error;return `${sectionHead('الإعدادات والإدارة','كل أدوات الإدارة في مكان واحد، والقائمة الجانبية تظل مختصرة.')}
-<div class="settings-grid">
-  ${me.role==='admin'?settingsLink('users','المستخدمون والصلاحيات','إنشاء المستخدمين، تفعيلهم، واختيار تخصيص الصلاحيات لكل مستخدم.','👥'):''}
-  ${me.role==='admin'?settingsLink('cosettings','البيانات الأساسية للشركة','اسم الشركة والرقم الضريبي وبادئة الفواتير والضريبة والمخزون وحد الخصم واللوجو.','🧾'):''}
-  ${me.role==='admin'?settingsLink('fullbak','النسخة الكاملة والاستعادة','نسخة كاملة تتنزل على جهازك (كل البيانات والمستخدمين والملفات)، واستعادتها.','💾'):''}
-  ${me.role==='admin'?settingsLink('printcfg','تخصيص الطباعة','اللوجو واسم الشركة والعنوان ولون الخط الفاصل ونص أسفل الطباعة.','🖨'):''}
-  <button class="settings-tile" onclick="forgetDevice()"><span class="settings-icon">🔐</span><span><b>نسيت الجهاز ده</b><small>يلغي الجهاز المتذكر، والدخول الجاي يطلب كود التحقق.</small></span><span class="settings-arrow">‹</span></button>
-  ${settingsLink('data','الاستيراد والتصدير','CSV للبيانات الأساسية والأرصدة الافتتاحية.','⇄')}
-  ${me.role==='admin'?settingsLink('org','الفروع ومراكز التكلفة','إدارة الهيكل التنظيمي ومراكز التكلفة.','🏢'):''}
-  ${me.role==='admin'?settingsLink('period','الفترات والإقفال','فتح وإقفال الفترات ومراقبة القيود.','🗓'):''}
-  ${me.role==='admin'?settingsLink('appr','الاعتمادات','إدارة طلبات الاعتماد والموافقات.','✓'):''}
-  ${me.role==='admin'?settingsLink('int','التكاملات','إدارة الاتصالات والتكاملات الخارجية.','↔'):''}
-  ${me.role==='admin'?settingsLink('audit','سجل العمليات','مراجعة العمليات والتغييرات.','⌁'):''}
-  ${me.isDev?settingsLink('health','فحص الجاهزية','فحوصات الصحة وGo-Live.','♥'):''}
-  <button class="settings-tile" onclick="toggleDialect()"><span class="settings-icon">ع</span><span><b>اللغة وأسلوب الكلام: ${({eg:'عامية مصرية',msa:'فصحى',en:'English'})[dialectMode()]||'عامية مصرية'}</b><small>اضغط عشان تبدّل بين العامية المصرية والفصحى (التبديل ده على الجهاز ده).</small></span><span class="settings-arrow">‹</span></button>
-  ${me.isDev?'<button class="settings-tile" onclick="go(\'devset\')"><span class="settings-icon">⚙</span><span><b>إعدادات المطور</b><small>قفل الموقع وفتحه، خروج كل الجلسات، تحديث الواجهة، والفحوصات.</small></span><span class="settings-arrow">‹</span></button>':''}
-
-</div>
+const sRow=(onclick,icon,title,desc)=>`<button class="st-row" onclick="${onclick}"><span class="st-ic">${icon}</span><span class="st-tx"><b>${title}</b><small>${desc}</small></span><span class="st-ch">‹</span></button>`;
+const sLink=(id,icon,title,desc)=>can(id)?sRow(`go('${id}')`,icon,title,desc):'';
+const sGroup=(cls,title,rows)=>{const body=rows.filter(Boolean).join('');return body?`<section class="st-group ${cls}"><h3>${title}</h3><div class="st-list">${body}</div></section>`:''};
+async function settingsView(){const{data:s,error}=await sb.from('company_settings').select('*').single();if(error)throw error;const adm=me.role==='admin';
+ const groups=[
+  sGroup('st-g-co','الشركة',[adm?sLink('cosettings','🧾','البيانات الأساسية للشركة','اسم الشركة والرقم الضريبي وبادئة الفواتير والضريبة والمخزون وحد الخصم واللوجو.'):'',adm?sLink('printcfg','🖨','تخصيص الطباعة','اللوجو واسم الشركة والعنوان ولون الخط الفاصل ونص أسفل الطباعة.'):'',adm?sLink('org','🏢','الفروع ومراكز التكلفة','إدارة الهيكل التنظيمي ومراكز التكلفة.'):'',adm?sLink('period','🗓','الفترات والإقفال','فتح وإقفال الفترات ومراقبة القيود.'):'']),
+  sGroup('st-g-team','الفريق والصلاحيات',[adm?sLink('users','👥','المستخدمون والصلاحيات','إنشاء المستخدمين، تفعيلهم، واختيار تخصيص الصلاحيات لكل مستخدم.'):'',adm?sLink('appr','✓','الاعتمادات','إدارة طلبات الاعتماد والموافقات.'):'',adm?sLink('audit','⌁','سجل العمليات','مراجعة العمليات والتغييرات.'):'']),
+  sGroup('st-g-data','البيانات والنسخ',[sLink('data','⇄','الاستيراد والتصدير','CSV للبيانات الأساسية والأرصدة الافتتاحية.'),adm?sLink('fullbak','💾','النسخة الكاملة والاستعادة','نسخة كاملة تتنزل على جهازك (كل البيانات والمستخدمين والملفات)، واستعادتها.'):'',adm?sLink('int','↔','التكاملات','إدارة الاتصالات والتكاملات الخارجية.'):'']),
+  sGroup('st-g-acc','حسابي',[sRow('forgetDevice()','🔐','نسيت الجهاز ده','يلغي الجهاز المتذكر، والدخول الجاي يطلب كود التحقق.'),sRow('toggleDialect()','ع',`اللغة: ${({eg:'عامية مصرية',msa:'فصحى',en:'English'})[dialectMode()]||'عامية مصرية'}`,'اضغط عشان تبدّل بين العامية المصرية والفصحى والإنجليزي (على الجهاز ده).')]),
+  sGroup('st-g-dev','المطور',[me.isDev?sLink('health','♥','فحص الجاهزية','فحوصات الصحة وGo-Live.'):'',me.isDev?sRow("go('devset')",'⚙','إعدادات المطور','قفل الموقع وفتحه، خروج كل الجلسات، تحديث الواجهة، والفحوصات.'):''])
+ ].join('');
+ return `${sectionHead('الإعدادات والإدارة','كل أدوات الإدارة في مكان واحد.')}
+<div class="st-wrap">${groups}</div>
 <div class="card offline-card"><b>النسخ الاحتياطي الكامل</b><p class="muted">النسخة الكاملة (قاعدة البيانات والمستخدمين والملفات) بتتعمل تلقائياً كل يوم على Google Drive، وبتتشفّر. الاستعادة حالياً بتتم من جهاز المطور.</p></div>`}
 async function coSettingsView(){const{data:s,error}=await sb.from('company_settings').select('*').single();if(error)throw error;return `${sectionHead('البيانات الأساسية للشركة','بيانات الفواتير والضريبة والمخزون وحد الخصم.')}${coCardHtml(s)}`}
 function printSettingsView(){return `${sectionHead('تخصيص الطباعة','إعدادات الطباعة لكل الكشوف والفواتير.')}${printCardHtml()}`}
@@ -653,7 +648,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.78';
+const APP_VERSION='v1.79';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -3223,7 +3218,14 @@ const EN_PAIRS=[
 ["خطوة واحدة متبقية","One step left"],
 ["المخزون السليم","Healthy stock"],
 ["مخزون سليم","Healthy stock"],
-["نظرة سريعة على أداء النشاط","A quick look at business performance"]];
+["نظرة سريعة على أداء النشاط","A quick look at business performance"]
+["الفريق والصلاحيات","Team & permissions"],
+["البيانات والنسخ","Data & backups"],
+["حسابي","My account"],
+["اللغة:","Language:"],
+["اضغط عشان تبدّل بين العامية المصرية والفصحى والإنجليزي (على الجهاز ده).","Tap to switch between Egyptian colloquial, formal Arabic and English (on this device)."],
+["نسخة كاملة تتنزل على جهازك (كل البيانات والمستخدمين والملفات)، واستعادتها.","Full backup downloaded to your device (all data, users and files), and restore."],
+["كل أدوات الإدارة في مكان واحد.","All admin tools in one place."]];
 EN_PAIRS.sort((a,b)=>b[0].length-a[0].length);
 
 function dialectMode(){try{return localStorage.getItem('erp_dialect')||'eg'}catch{return 'eg'}}
