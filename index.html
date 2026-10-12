@@ -429,13 +429,13 @@ async function usersView(){
 }
 function addUserCard(){
   const roles=['accountant','sales','store','admin',...(me.isDev?['developer']:[])];
-  return `<div class="card form-card"><div class="card-title"><b>إضافة مستخدم جديد</b><span class="muted">الحساب بيتفعّل فوراً بالدور اللي تختاره</span></div><div class="row"><input id="nu_name" placeholder="الاسم"><input id="nu_email" type="email" placeholder="الإيميل"><input id="nu_pass" type="password" placeholder="كلمة السر (8 حروف على الأقل)"><select id="nu_role">${roles.map(r=>`<option value="${r}">${r}</option>`).join('')}</select><button class="btn" onclick="createAppUser()">إضافة المستخدم</button></div></div>`;
+  return `<div class="card form-card"><div class="card-title"><b>إضافة مستخدم جديد</b><span class="muted">الحساب بيتفعّل فوراً بالدور اللي تختاره</span></div><div class="row"><input id="nu_name" placeholder="الاسم"><input id="nu_user" placeholder="اسم المستخدم (للدخول)" autocomplete="off"><input id="nu_email" type="email" placeholder="الإيميل"><input id="nu_phone" type="tel" placeholder="الموبايل (+20...)"><input id="nu_pass" type="password" placeholder="كلمة السر (8 حروف على الأقل)"><select id="nu_role">${roles.map(r=>`<option value="${r}">${r}</option>`).join('')}</select><button class="btn" onclick="createAppUser()">إضافة المستخدم</button></div></div>`;
 }
 async function createAppUser(){
-  const name=v('nu_name').trim(), email=v('nu_email').trim(), password=v('nu_pass'), role=v('nu_role');
-  if(!name||!email||password.length<8){toast('أدخل الاسم والإيميل وكلمة سر 8 حروف على الأقل');return}
+  const name=v('nu_name').trim(), username=v('nu_user').trim(), email=v('nu_email').trim(), phone=v('nu_phone').replace(/\s+/g,''), password=v('nu_pass'), role=v('nu_role');
+  if(!name||!username||!email||!phone||password.length<8){toast('أدخل الاسم واسم المستخدم والإيميل والموبايل وكلمة سر 8 حروف على الأقل');return}
   await act(async()=>{
-    const{data,error}=await sb.functions.invoke('admin-create-user',{body:{name,email,password,role}});
+    const{data,error}=await sb.functions.invoke('admin-create-user',{body:{name,username,email,phone,password,role}});
     if(error){let msg=error.message;try{const j=await error.context.json();if(j&&j.error)msg=j.error}catch(_){}throw Error(msg)}
     if(data&&data.error)throw Error(data.error);
   });
@@ -491,7 +491,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.64';
+const APP_VERSION='v1.66';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -510,9 +510,10 @@ function bottomNav(){return NAV.filter(x=>can(x[0])).filter(x=>['dash','sales','
 let _qTimer=null;
 function qSearch(el){window._q=el.value;clearTimeout(_qTimer);_qTimer=setTimeout(()=>{R(1).then(()=>{const q=document.getElementById('q');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}})},250)}
 function readCachedC(){const r=k=>{try{return JSON.parse(localStorage.getItem('erp_cache_'+k)||'null')}catch{return null}};const products=r('products'),customers=r('customers'),suppliers=r('suppliers'),warehouses=r('warehouses'),stock=r('stock'),cb=r('cb'),sbal=r('sbal');if(!products||!customers||!suppliers||!warehouses||!stock||!cb||!sbal)return null;return{products,customers,suppliers,warehouses,accts:r('cash_accounts')||[],stock,cb,sbal}}
-function _loginScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>تسجيل الدخول</h2><p class="login-sub">ادخل إلى لوحة إدارة الشركة</p><div class="login-field"><label for="lu">البريد الإلكتروني</label><input id="lu" type="email" autocomplete="email" placeholder="name@company.com"></div><div class="login-field"><label for="lp">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="login-actions"><button class="btn" style="width:100%;min-height:48px" onclick="login()">دخول</button></div><p class="login-note">الحساب الأول في المشروع الجديد يُنشأ كمدير حسب إعدادات قاعدة البيانات.</p></section></div>`}
+function _loginScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>تسجيل الدخول</h2><p class="login-sub">ادخل إلى لوحة إدارة الشركة</p><div class="login-field"><label for="lu">الإيميل أو اسم المستخدم</label><input id="lu" type="text" autocomplete="username" placeholder="name@company.com أو اسم المستخدم"></div><div class="login-field"><label for="lp">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="login-actions"><button class="btn" style="width:100%;min-height:48px" onclick="login()">دخول</button></div><p class="login-note">الحساب الأول في المشروع الجديد يُنشأ كمدير حسب إعدادات قاعدة البيانات.</p></section></div>`}
 function _inactiveScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>الحساب بانتظار التفعيل</h2><p class="login-sub">سيتطلب الحساب تفعيل المدير قبل استخدام النظام.</p><button class="btn" style="width:100%;min-height:48px" onclick="logout()">خروج</button></section></div>`}
-async function login(){return withLoading(async()=>{const{error}=await sb.auth.signInWithPassword({email:v('lu'),password:v('lp')});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
+async function resolveLoginEmail(id){id=String(id||'').trim();if(!id)return '';if(id.includes('@'))return id.toLowerCase();const{data,error}=await sb.rpc('resolve_login',{p_identifier:id});if(error)throw error;return data||''}
+async function login(){return withLoading(async()=>{const email=await resolveLoginEmail(v('lu'));if(!email)throw Error('Invalid login credentials');const{error}=await sb.auth.signInWithPassword({email,password:v('lp')});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
 async function logout(){return withLoading(async()=>{await sb.auth.signOut();me=null;localStorage.removeItem('erp_v_view');view='dash';await R()},'جاري تسجيل الخروج...','جارٍ إنهاء الجلسة بأمان')}
 
 // ----- قفل الموقع + خروج كل الجلسات (v1.61) -----
@@ -1670,7 +1671,7 @@ async function login(){
   loginMsg('');
   if(!email||!pass)return loginMsg('اكتب البريد الإلكتروني وكلمة المرور');
   try{
-    await withLoading(async()=>{const{error}=await sb.auth.signInWithPassword({email,password:pass});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان');
+    await withLoading(async()=>{const em=await resolveLoginEmail(email);if(!em)throw Error('Invalid login credentials');const{error}=await sb.auth.signInWithPassword({email:em,password:pass});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان');
   }catch(x){
     const m=String(x?.message||x?.error_description||x||'');
     if(/invalid login|invalid_credentials|invalid.*(credential|password)/i.test(m))return loginMsg('البريد الإلكتروني أو كلمة المرور غلط');
