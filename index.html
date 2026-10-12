@@ -382,7 +382,7 @@ let customPermMode='role',customPerms=new Set();
 const NAV_GROUPS=[
   ['الرئيسية',['dash'],'overview'],
   ['المبيعات',['sales','ord','quo','dn','ret','cust','price','comm'],'sales'],
-  ['المشتريات',['purch','po','grn'],'purch'],
+  ['المشتريات',['purch','po','grn','supp'],'purch'],
   ['المخزون',['prod','whs','trf','stk','trace'],'inventory'],
   ['الخزينة والبنوك',['cash','bank','chk','pay','exp'],'treasury'],
   ['المحاسبة والتقارير',['stmt','jr','rep','asset','taxdoc'],'accounting'],
@@ -648,7 +648,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.80';
+const APP_VERSION='v1.81';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
