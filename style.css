@@ -706,3 +706,23 @@ body{background:#f4f6fa}
 
 /* v1.86 one icon style on every device (inline SVG, no emoji) */
 .ico{width:1em;height:1em;vertical-align:-.15em;flex:none;display:inline-block}
+
+/* v1.87 icon system: one size, aligned in every button/tile, all screens */
+:root{--ico:18px}
+.ico{width:var(--ico);height:var(--ico);vertical-align:middle;flex:0 0 auto;display:inline-block;stroke-width:2}
+.btn,.iconbtn,.doc-btn,.role-pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;line-height:1.2;white-space:nowrap}
+.btn .ico,.doc-btn .ico,.iconbtn .ico{--ico:17px}
+.btn.sm .ico{--ico:15px}
+.iconbtn{padding:0 10px}
+.sidebar nav a,.sidebar nav button{display:flex;align-items:center;gap:10px}
+.sidebar nav .ico{--ico:18px}
+.hm-q{display:flex;align-items:center;gap:10px;min-width:0}
+.hm-q>span{width:36px;height:36px;min-width:36px;border-radius:11px;display:grid;place-items:center}
+.hm-q>span .ico{--ico:18px}
+.hm-q{font-size:14px;line-height:1.3}
+.ico-s{display:inline-flex;align-items:center;color:var(--muted,#667085)}
+.ico-s .ico{--ico:18px}
+.page h2 .ico,.page b .ico{--ico:1em;vertical-align:-.12em}
+.mobile-bottom button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.mobile-menu-btn{display:inline-flex;align-items:center;justify-content:center}
+.mobile-menu-btn .ico{--ico:22px}
