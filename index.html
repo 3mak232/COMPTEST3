@@ -260,6 +260,7 @@ async function settingsView(){const{data:s,error}=await sb.from('company_setting
   ${me.role==='admin'?settingsLink('cosettings','البيانات الأساسية للشركة','اسم الشركة والرقم الضريبي وبادئة الفواتير والضريبة والمخزون وحد الخصم واللوجو.','🧾'):''}
   ${me.role==='admin'?settingsLink('fullbak','النسخة الكاملة والاستعادة','نسخة كاملة تتنزل على جهازك (كل البيانات والمستخدمين والملفات)، واستعادتها.','💾'):''}
   ${me.role==='admin'?settingsLink('printcfg','تخصيص الطباعة','اللوجو واسم الشركة والعنوان ولون الخط الفاصل ونص أسفل الطباعة.','🖨'):''}
+  <button class="settings-tile" onclick="forgetDevice()"><span class="settings-icon">🔐</span><span><b>نسيت الجهاز ده</b><small>يلغي الجهاز المتذكر، والدخول الجاي يطلب كود التحقق.</small></span><span class="settings-arrow">‹</span></button>
   ${settingsLink('data','الاستيراد والتصدير','CSV للبيانات الأساسية والأرصدة الافتتاحية.','⇄')}
   ${me.role==='admin'?settingsLink('org','الفروع ومراكز التكلفة','إدارة الهيكل التنظيمي ومراكز التكلفة.','🏢'):''}
   ${me.role==='admin'?settingsLink('period','الفترات والإقفال','فتح وإقفال الفترات ومراقبة القيود.','🗓'):''}
@@ -593,7 +594,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.73';
+const APP_VERSION='v1.75';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -675,11 +676,21 @@ async function devUnlock(){
   try{await rpc('dev_set_lock',{p_locked:false,p_msg:'',p_roles:[],p_until:null});alert('الموقع اتفتح.');await R()}
   catch(x){alert('تعذر: '+(x.message||x))}
 }
+async function forgetDevice(){
+  if(!confirm('نسيت الجهاز ده؟ الدخول الجاي من الجهاز ده هيطلب كود التحقق.'))return;
+  try{
+    const{error}=await sb.rpc('revoke_my_trusted_device');
+    if(error)throw error;
+    try{localStorage.removeItem(TRUST_KEY)}catch(_){}
+    toast('اتلغى الجهاز المتذكر');
+  }catch(x){alert('تعذر إلغاء الجهاز: '+(x.message||x))}
+}
 async function devRevokeAll(){
   if(!confirm('نسجّل خروج كل المستخدمين؟ حسابك كمان هيتقفل ولازم تسجل دخول تاني.'))return;
   try{
     await rpc('dev_revoke_all_sessions',{});
     try{localStorage.removeItem(SESS_SEEN_KEY)}catch{}
+    try{localStorage.removeItem(TRUST_KEY)}catch{}
     try{await sb.auth.signOut()}catch{}
     location.reload();
   }catch(x){alert('تعذر: '+(x.message||x))}
