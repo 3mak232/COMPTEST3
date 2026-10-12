@@ -491,7 +491,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.66';
+const APP_VERSION='v1.68';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -510,7 +510,7 @@ function bottomNav(){return NAV.filter(x=>can(x[0])).filter(x=>['dash','sales','
 let _qTimer=null;
 function qSearch(el){window._q=el.value;clearTimeout(_qTimer);_qTimer=setTimeout(()=>{R(1).then(()=>{const q=document.getElementById('q');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}})},250)}
 function readCachedC(){const r=k=>{try{return JSON.parse(localStorage.getItem('erp_cache_'+k)||'null')}catch{return null}};const products=r('products'),customers=r('customers'),suppliers=r('suppliers'),warehouses=r('warehouses'),stock=r('stock'),cb=r('cb'),sbal=r('sbal');if(!products||!customers||!suppliers||!warehouses||!stock||!cb||!sbal)return null;return{products,customers,suppliers,warehouses,accts:r('cash_accounts')||[],stock,cb,sbal}}
-function _loginScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>تسجيل الدخول</h2><p class="login-sub">ادخل إلى لوحة إدارة الشركة</p><div class="login-field"><label for="lu">الإيميل أو اسم المستخدم</label><input id="lu" type="text" autocomplete="username" placeholder="name@company.com أو اسم المستخدم"></div><div class="login-field"><label for="lp">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="login-actions"><button class="btn" style="width:100%;min-height:48px" onclick="login()">دخول</button></div><p class="login-note">الحساب الأول في المشروع الجديد يُنشأ كمدير حسب إعدادات قاعدة البيانات.</p></section></div>`}
+function _loginScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>تسجيل الدخول</h2><p class="login-sub">ادخل إلى لوحة إدارة الشركة</p><div class="login-field"><label for="lu">الإيميل أو اسم المستخدم أو الموبايل</label><input id="lu" type="text" autocomplete="username" placeholder="إيميل أو اسم مستخدم أو موبايل"></div><div class="login-field"><label for="lp">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="login-actions"><button class="btn" style="width:100%;min-height:48px" onclick="login()">دخول</button></div><p class="login-note">الحساب الأول في المشروع الجديد يُنشأ كمدير حسب إعدادات قاعدة البيانات.</p></section></div>`}
 function _inactiveScreen(){$('#app').innerHTML=`<div class="login-page"><section class="login-card"><div class="login-brand"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>منظومة إدارة الأعمال</small></div></div><h2>الحساب بانتظار التفعيل</h2><p class="login-sub">سيتطلب الحساب تفعيل المدير قبل استخدام النظام.</p><button class="btn" style="width:100%;min-height:48px" onclick="logout()">خروج</button></section></div>`}
 async function resolveLoginEmail(id){id=String(id||'').trim();if(!id)return '';if(id.includes('@'))return id.toLowerCase();const{data,error}=await sb.rpc('resolve_login',{p_identifier:id});if(error)throw error;return data||''}
 async function login(){return withLoading(async()=>{const email=await resolveLoginEmail(v('lu'));if(!email)throw Error('Invalid login credentials');const{error}=await sb.auth.signInWithPassword({email,password:v('lp')});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
@@ -665,8 +665,39 @@ function gsKey(ev){
   if(ev.key==='Enter'&&_gsList.length){ev.preventDefault();gsGo(0)}
 }
 document.addEventListener('click',ev=>{if(!ev.target.closest('.top-search'))gsHide()});
+
+// ----- MFA للأدمن والمطور (v1.68) -----
+function mfaScreen(html){
+  document.body.insertAdjacentHTML('beforeend',`<div id="mfaBg" style="position:fixed;inset:0;background:var(--bg,#fff);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px"><div style="max-width:420px;width:100%">${html}</div></div>`);
+}
+function mfaClose(){const m=document.getElementById('mfaBg');if(m)m.remove()}
+async function mfaVerifyCode(factorId){
+  const code=(document.getElementById('mfaCode')?.value||'').replace(/\s+/g,'');
+  if(!/^\d{6}$/.test(code)){toast('اكتب الكود المكون من 6 أرقام');return}
+  const{data:ch,error:e1}=await sb.auth.mfa.challenge({factorId});
+  if(e1){toast('تعذر بدء التحقق: '+e1.message);return}
+  const{error:e2}=await sb.auth.mfa.verify({factorId,challengeId:ch.id,code});
+  if(e2){toast('الكود غلط أو منتهي، جرّب تاني');return}
+  mfaClose();
+  await boot();
+}
+async function mfaGate(){
+  if(!me||!['admin','developer'].includes(me.realRole))return false;
+  const{data:aal,error}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(error||!aal||aal.currentLevel==='aal2')return false;
+  const{data:f}=await sb.auth.mfa.listFactors();
+  const verified=(f?.totp||[]).find(x=>x.status==='verified');
+  if(verified){
+    mfaScreen(`<div class="card form-card"><div class="card-title"><b>التحقق الثنائي</b><span class="muted">اكتب الكود اللي في تطبيق Authenticator</span></div><input id="mfaCode" inputmode="numeric" maxlength="8" placeholder="000000" style="text-align:center;letter-spacing:6px;font-size:20px"><button class="btn" style="width:100%;margin-top:10px" onclick="mfaVerifyCode('${verified.id}')">تأكيد</button><button class="btn s" style="width:100%;margin-top:8px" onclick="logout()">خروج</button></div>`);
+    return true;
+  }
+  const{data:en,error:e2}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'ERP Authenticator'});
+  if(e2){toast('تعذر تفعيل MFA: '+e2.message);return true}
+  mfaScreen(`<div class="card form-card"><div class="card-title"><b>فعّل التحقق الثنائي</b><span class="muted">مطلوب للأدمن. افتح تطبيق Authenticator (Google/Microsoft) وامسح الكود، أو اكتب المفتاح يدوياً.</span></div><div style="text-align:center"><img alt="QR" src="${en.totp.qr_code}" style="max-width:200px;width:100%;background:#fff;padding:8px;border-radius:8px"></div><p class="muted" style="word-break:break-all;font-size:12px">المفتاح: ${e(en.totp.secret)}</p><input id="mfaCode" inputmode="numeric" maxlength="8" placeholder="الكود من التطبيق" style="text-align:center;letter-spacing:6px;font-size:20px"><button class="btn" style="width:100%;margin-top:10px" onclick="mfaVerifyCode('${en.id}')">تأكيد وتفعيل</button><button class="btn s" style="width:100%;margin-top:8px" onclick="logout()">خروج</button></div>`);
+  return true;
+}
 async function boot(){const{data:{user}}=await sb.auth.getUser();
-  if(await lockGate(!!user))return;me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
+  if(await lockGate(!!user))return;me=null;if(user){const{data,error}=await sb.from('profiles').select('*').eq('id',user.id).single();if(!error)me=data}if(me){me.realRole=me.role;me.isDev=me.role==='developer';if(me.isDev)me.role='admin'}if(me&&await mfaGate())return;if(me)await Promise.all([loadMyPermissions(),loadQuick()]);await R()}
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMobileNav()});
 window.addEventListener('pageshow',()=>{ hideLoader(); });
 window.addEventListener('unhandledrejection',()=>{ if(_loading) hideLoader(); });
