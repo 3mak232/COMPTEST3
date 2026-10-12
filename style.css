@@ -635,3 +635,14 @@ body{background:#f4f6fa}
   .tw-stack td .tk-v:empty{display:none}
   .tw-stack td .tk-v button{min-height:40px}
 }
+/* v1.79b: الأطراف على الموبايل + الترحيب */
+.hm-hero,.hm-hero h2,.hm-hero p,.hm-date{color:#fff}
+.hm-hero h2{text-shadow:0 2px 14px rgba(0,0,0,.25)}
+@media(max-width:780px){
+  .tw-stack td.pt-acts{display:block;padding-top:10px}
+  .tw-stack td.pt-acts .row-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tw-stack td.pt-acts .row-btns button{min-height:42px;width:100%}
+  .party-stats{grid-template-columns:1fr!important;gap:8px}
+  .party-stats>div{padding:12px 14px}
+  .tw-stack td .tk-v b{font-size:15px}
+}

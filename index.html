@@ -373,7 +373,7 @@ function openMobileNav(){const s=document.querySelector('.sidebar');const o=docu
 function closeMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.remove('open');if(o)o.classList.remove('open');document.body.classList.remove('menu-open')}
 // --- Enterprise UI layer ---
 const navOld = [['dash','الرئيسية'],['prod','الأصناف'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلام المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','التحصيل والمدفوعات'],['exp','المصروفات'],['cash','الخزينة والبنوك'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','التحويلات المخزنية'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الموارد البشرية'],['prl','المرتبات'],['period','الفترات والإقفال'],['org','الفروع ومراكز التكلفة'],['trace','تتبع المخزون / MRP'],['data','استيراد وتصدير'],['appr','الاعتمادات'],['taxdoc','المستندات الضريبية'],['users','المستخدمون'],['audit','سجل العمليات'],['health','فحص الجاهزية'],['int','التكاملات'],['set','الإعدادات والإدارة']];
-const NAV2=[...navOld];
+const NAV2=[...navOld, ...NAV.filter(x=>['chk','jr','rep'].includes(x[0]))];
 const ROLE2={admin:'*',accountant:['dash','prod','cust','supp','sales','quo','ord','dn','ret','purch','po','grn','pay','chk','exp','cash','bank','trf','stk','price','comm','asset','hr','emp','prl','rep','jr','taxdoc','trace'],sales:['dash','prod','cust','sales','quo','ord','dn','ret','price','comm'],store:['dash','prod','po','grn','trf','stk','trace']};
 P.admin='*'; P.accountant=ROLE2.accountant; P.sales=ROLE2.sales; P.store=ROLE2.store;
 NAV.splice(0,NAV.length,...NAV2);
@@ -398,7 +398,7 @@ function renderNavGroups(){
     if(!items.length)return '';
     if(items.length===1&&items[0][1]===title)return `<a class="nav-single${view===items[0][0]?' on':''}" onclick="go('${items[0][0]}')"><span class="nav-dot"></span><span>${title}</span></a>`;
     const isActive=activeGroup&&activeGroup[2]===gid;
-    const collapsed=state[gid]===undefined?(gid==='overview'||isActive?'':' collapsed'):(state[gid]?'':' collapsed');
+    const collapsed=state[gid]===undefined?'':(state[gid]?'':' collapsed');
     return `<section class="nav-group${collapsed}" data-group="${gid}"><div class="nav-group-title" onclick="toggleNavGroup('${gid}',event)"><span>${title}</span><button class="nav-toggle" aria-label="فتح ${title}">${collapsed?'▸':'⌄'}</button></div><div class="group-items">${items.map(x=>`<a class="${view===x[0]?'on':''}" onclick="go('${x[0]}');event.stopPropagation()"><span class="nav-dot"></span><span>${x[1]}</span></a>`).join('')}</div></section>`;
   }).join('')+`<div class="side-hint">القائمة مختصرة. الإدارة والاستيراد والنسخ الاحتياطي والصلاحيات داخل الإعدادات.</div>`;
 }
@@ -648,7 +648,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.79';
+const APP_VERSION='v1.80';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1999,7 +1999,7 @@ async function partiesView(){
     const acts=[`<button class="s" onclick="partyEdit('${x.party_id}')">تعديل</button>`];
     if(x.customer_id)acts.push(`<button class="s" onclick="partyStmt('${x.party_id}')">كشف الحساب</button>`);
     acts.push(`<button class="s" onclick="act(()=>rpc('set_party_active',{p_party:'${x.party_id}',p_on:${x.active?'false':'true'}}))">${x.active?'تعطيل':'تفعيل'}</button>`);
-    return `<tr data-s="${e((x.name+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase())}"><td><b>${e(x.name)}</b>${x.phone?`<br><small class="muted">${e(x.phone)}</small>`:''}</td><td>${fmt(x.receivable)}</td><td>${fmt(x.payable)}</td><td>${ptNet(x)}</td><td>${x.active?chip('مفعّل','success'):chip('موقوف','warning')}</td><td><div class="row-btns">${acts.join(' ')}</div></td></tr>`;
+    return `<tr data-s="${e((x.name+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase())}"><td><span class="tk-l">الطرف</span><span class="tk-v"><b>${e(x.name)}</b>${x.phone?`<br><small class="muted">${e(x.phone)}</small>`:''}</span></td><td><span class="tk-l">عليه فلوس لينا</span><span class="tk-v">${fmt(x.receivable)}</span></td><td><span class="tk-l">علينا فلوس ليه</span><span class="tk-v">${fmt(x.payable)}</span></td><td><span class="tk-l">الصافي</span><span class="tk-v">${ptNet(x)}</span></td><td><span class="tk-l">الحالة</span><span class="tk-v">${x.active?chip('مفعّل','success'):chip('موقوف','warning')}</span></td><td class="pt-acts"><div class="row-btns">${acts.join(' ')}</div></td></tr>`;
   }).join('');
   const canNew=me&&['admin','accountant','sales','store'].includes(me.role);
   const form=canNew?`<div class="card form-card"><div class="card-title"><b>طرف جديد</b><span class="muted">الطرف بيتسجل عميل ومورد مع بعض، برصيد واحد صافي.</span></div>
@@ -2008,7 +2008,7 @@ async function partiesView(){
   return sectionHead('الأطراف','كل طرف عميل ومورد في نفس الوقت، برصيد صافي واحد.')+form+
     `<div class="party-stats"><div><small>إجمالي عليه فلوس لينا</small><b class="good">${fmt(sumR)}</b></div><div><small>إجمالي علينا فلوس ليه</small><b class="bad">${fmt(sumP)}</b></div><div><small>الصافي</small><b>${fmt(sumR-sumP)}</b></div></div>
     <div class="card np">${bar}<input class="inv-search" type="search" placeholder="بحث بالاسم أو الهاتف أو البريد" oninput="invFilter(this.value)" style="margin-top:8px"></div>
-    <div class="card"><div class="table-wrap"><table class="inv-table"><thead><tr><th>الطرف</th><th>عليه فلوس لينا</th><th>علينا فلوس ليه</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد أطراف في هذا التبويب</td></tr>'}</tbody></table></div></div>`;
+    <div class="card"><div class="table-wrap tw-stack"><table class="inv-table"><thead><tr><th>الطرف</th><th>عليه فلوس لينا</th><th>علينا فلوس ليه</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead><tbody id="invBody">${rows||'<tr><td colspan="6" class="muted">لا توجد أطراف في هذا التبويب</td></tr>'}</tbody></table></div></div>`;
 }
 async function partyNew(){
   if(!v('pn').trim())return alert('اكتب اسم الطرف');
