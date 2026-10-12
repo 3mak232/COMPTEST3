@@ -703,3 +703,6 @@ body{background:#f4f6fa}
 .scan-box{background:var(--card,#fff);color:var(--ink,#111);border-radius:14px;padding:14px;width:min(420px,100%);display:grid;gap:10px}
 .scan-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #scanVid{width:100%;max-height:60vh;border-radius:10px;background:#000;object-fit:cover}
+
+/* v1.86 one icon style on every device (inline SVG, no emoji) */
+.ico{width:1em;height:1em;vertical-align:-.15em;flex:none;display:inline-block}
