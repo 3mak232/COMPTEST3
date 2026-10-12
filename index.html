@@ -16,7 +16,10 @@
 <body><div id="app"></div><div id="globalLoader" aria-live="polite"><div class="loader-card"><div class="loader-ring"></div><b id="loaderTitle">جاري التحميل...</b><div class="muted" id="loaderText">من فضلك انتظر</div></div></div><div id="toast" class="toast"></div>
 <script>
 const URL_='https://qzvnuyapnkkhxdlocpms.supabase.co',KEY='sb_publishable_nOGPR20SXq8HMBCHEo166w_b1PstYxN';
-const sb=supabase.createClient(URL_,KEY);
+const TRUST_KEY='erp_dev_trust';
+const trustTok=()=>{try{return localStorage.getItem(TRUST_KEY)||''}catch(_){return ''}};
+const newTrustTok=()=>[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const sb=supabase.createClient(URL_,KEY,{global:{headers:{'x-device-trust':trustTok()}}});
 let me=null,view=localStorage.getItem('erp_v_view')||'dash',C={},cart={s:[],p:[],q:[],t:[]},RT=null,st='',tests=null,per='month',d1='',d2='',payInvoices=[],stk=null;
 const $=s=>document.querySelector(s),v=id=>{const x=$('#'+id);return x?x.value:''},n=id=>+v(id)||0,e=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=x=>(+x||0).toLocaleString('ar-EG',{maximumFractionDigits:2});
@@ -53,7 +56,7 @@ const isAdminRole=()=>!!me&&me.role==='admin';
 const DISC_MAX_PCT={sales:5};
 const canBase=x=>me&&(P[me.role]==='*'||P[me.role].includes(x));
 const can=x=>{if(!me)return false;if(x==='cust')return canRaw('cust')||canRaw('supp');return canRaw(x)};const canRaw=x=>{if(x==='health'||x==='devset')return !!me.isDev;if(me.role==='admin')return true;if(!canBase(x))return false;if(customPermMode==='custom')return customPerms.has(x);return true};
-const NAV=[['dash','الرئيسية'],['prod','المنتجات'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','أذونات التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلامات المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','المدفوعات'],['exp','المصروفات'],['cash','الخزينة'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','تحويل مخزني'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الحضور والإجازات'],['prl','المرتبات'],['mfg','التصنيع'],['pos','نقطة البيع'],['proj','المشروعات والخدمات'],['org','الفروع ومراكز التكلفة'],['period','الفترات المالية'],['appr','الاعتمادات'],['chk','الشيكات'],['taxdoc','المستندات الضريبية'],['int','التكاملات'],['rep','التقارير'],['jr','الحسابات'],['health','فحص الجاهزية'],['users','المستخدمون'],['audit','سجل العمليات'],['set','الإعدادات']];
+const NAV=[['dash','الرئيسية'],['prod','المنتجات'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','أذونات التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلامات المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','المدفوعات'],['exp','المصروفات'],['cash','الخزينة'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','تحويل مخزني'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الحضور والإجازات'],['prl','المرتبات'],['mfg','التصنيع'],['pos','نقطة البيع'],['proj','المشروعات والخدمات'],['org','الفروع ومراكز التكلفة'],['period','الفترات المالية'],['appr','الاعتمادات'],['chk','الشيكات'],['taxdoc','المستندات الضريبية'],['int','التكاملات'],['rep','التقارير'],['jr','الحسابات'],['health','فحص الجاهزية'],['users','المستخدمون'],['audit','سجل العمليات'],['set','الإعدادات والإدارة']];
 const rpc=async(f,a={})=>{const{data,error}=await sb.rpc(f,a);if(error)throw error;return data};
 const ins=async(t,o)=>{const{data,error}=await sb.from(t).insert(o).select().single();if(error)throw error;return data};
 const upd=async(t,id,o)=>{const{error}=await sb.from(t).update(o).eq('id',id);if(error)throw error};
@@ -373,7 +376,7 @@ async function runSmokeTest(){const box=$('#smokeResult');if(box)box.innerHTML='
 function openMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.add('open');if(o)o.classList.add('open');document.body.classList.add('menu-open')}
 function closeMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.remove('open');if(o)o.classList.remove('open');document.body.classList.remove('menu-open')}
 // --- Enterprise UI layer ---
-const navOld = [['dash','الرئيسية'],['prod','الأصناف'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلام المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','التحصيل والمدفوعات'],['exp','المصروفات'],['cash','الخزينة والبنوك'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','التحويلات المخزنية'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الموارد البشرية'],['prl','المرتبات'],['period','الفترات والإقفال'],['org','الفروع ومراكز التكلفة'],['trace','تتبع المخزون / MRP'],['data','استيراد وتصدير'],['appr','الاعتمادات'],['taxdoc','المستندات الضريبية'],['users','المستخدمون'],['audit','سجل العمليات'],['health','فحص الجاهزية'],['int','التكاملات'],['set','الإعدادات']];
+const navOld = [['dash','الرئيسية'],['prod','الأصناف'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلام المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','التحصيل والمدفوعات'],['exp','المصروفات'],['cash','الخزينة والبنوك'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','التحويلات المخزنية'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الموارد البشرية'],['prl','المرتبات'],['period','الفترات والإقفال'],['org','الفروع ومراكز التكلفة'],['trace','تتبع المخزون / MRP'],['data','استيراد وتصدير'],['appr','الاعتمادات'],['taxdoc','المستندات الضريبية'],['users','المستخدمون'],['audit','سجل العمليات'],['health','فحص الجاهزية'],['int','التكاملات'],['set','الإعدادات والإدارة']];
 const NAV2=[...navOld];
 const ROLE2={admin:'*',accountant:['dash','prod','cust','supp','sales','quo','ord','dn','ret','purch','po','grn','pay','chk','exp','cash','bank','trf','stk','price','comm','asset','hr','emp','prl','rep','jr','taxdoc','trace'],sales:['dash','prod','cust','sales','quo','ord','dn','ret','price','comm'],store:['dash','prod','po','grn','trf','stk','trace']};
 P.admin='*'; P.accountant=ROLE2.accountant; P.sales=ROLE2.sales; P.store=ROLE2.store;
@@ -388,7 +391,7 @@ const NAV_GROUPS=[
   ['الخزينة والبنوك',['cash','bank','chk','pay','exp'],'treasury'],
   ['المحاسبة والتقارير',['stmt','jr','rep','asset','taxdoc'],'accounting'],
   ['الموظفون',['emp','hr','prl'],'hr'],
-  ['الإدارة',['set'],'admin']
+  ['الإعدادات والإدارة',['set'],'admin']
 ];
 function visibleNav(id){return !HIDDEN_MODULES.has(id)&&can(id)}
 function renderNavGroups(){
@@ -584,13 +587,13 @@ async function paintView(q){
   const shellKey=me.id+'|'+me.role+'|'+(me.isDev?'d':'');
   const viewChanged=window._animView!==view;window._animView=view;
   if(window._shellKey===shellKey&&$('.sidebar')&&$('.page')&&$('.mobile-bottom')){const pg=$('.page');if(window._lastLinks!==links){$('nav').innerHTML=links;window._lastLinks=links}pg.innerHTML=h;if(viewChanged){pg.classList.remove('pg-in');void pg.offsetWidth;pg.classList.add('pg-in')}$('.mobile-bottom').innerHTML=bottomNav()}
-  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.isDev?'مطور':me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search" style="position:relative"><span>⌕</span><input id="gs" autocomplete="off" placeholder="بحث سريع في النظام" oninput="gsSearch(this.value)" onkeydown="gsKey(event)"/><div id="gsRes" hidden style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card,#fff);color:var(--fg,#111);border:1px solid rgba(128,128,128,.25);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:999;max-height:60vh;overflow:auto;padding:6px;text-align:start"></div></div><div class="top-actions"><div id="netStatus"></div><button class="iconbtn" title="اللغة وأسلوب الكلام" onclick="toggleDialect()">🌐</button><span class="ver-pill" title="رقم الإصدار">${APP_VERSION}</span>${me.isDev?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
+  else{window._shellKey=shellKey;$('#app').innerHTML=`<div class="mobile-overlay" onclick="closeMobileNav()"></div><aside class="sidebar"><div class="brandbox"><div class="brandmark">E</div><div><b>ERP Enterprise</b><small>Finance · Inventory · Operations</small></div></div><div class="userbox"><div class="avatar">${e((me.name||'U').slice(0,1))}</div><div><b>${e(me.name)}</b><small>${e(me.isDev?'مطور':me.role)}</small></div></div><nav>${links}</nav><div class="side-bottom"><button class="sidebtn danger-link" onclick="closeMobileNav();logout()">تسجيل الخروج</button></div></aside><main class="shell"><header class="topbar"><button class="mobile-menu-btn" onclick="openMobileNav()" aria-label="فتح القائمة">☰</button><div class="top-search" style="position:relative"><span>⌕</span><input id="gs" autocomplete="off" placeholder="بحث سريع في النظام" oninput="gsSearch(this.value)" onkeydown="gsKey(event)"/><div id="gsRes" hidden style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card,#fff);color:var(--fg,#111);border:1px solid rgba(128,128,128,.25);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:999;max-height:60vh;overflow:auto;padding:6px;text-align:start"></div></div><div class="top-actions"><div id="netStatus"></div><label class="iconbtn" title="اللغة وأسلوب الكلام" style="display:inline-flex;align-items:center;gap:4px;padding:0 6px">🌐<select onchange="setDialect(this.value)" style="border:0;background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:700;cursor:pointer"><option value="eg" ${dialectMode()==='eg'?'selected':''}>AR · عامية</option><option value="msa" ${dialectMode()==='msa'?'selected':''}>AR · فصحى</option><option value="en" ${dialectMode()==='en'?'selected':''}>EN · English</option></select></label><span class="ver-pill" title="رقم الإصدار">${APP_VERSION}</span>${me.isDev?'<button class="iconbtn" title="فحص الجاهزية" onclick="go(\'health\')">✓</button>':''}<button class="role-pill">${e(me.role)}</button></div></header><div class="page${viewChanged?' pg-in':''}">${h}</div><div class="mobile-bottom">${bottomNav()}</div></main>`;}
   if(q){const i=$('#q');if(i){i.focus();i.setSelectionRange(99,99)}}
   updateOnlineStatus();
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.70';
+const APP_VERSION='v1.73';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -738,8 +741,13 @@ async function gsRun(q){
   const out=[];
   const add=(title,items,mk)=>{if(items.length)out.push([title,items.map(mk)])};
   if(C&&can('prod'))add('الأصناف',(C.products||[]).filter(hit).slice(0,5),x=>({label:x.name,sub:x.code||x.barcode||'',view:'prod',term:x.name}));
-  if(C&&can('cust'))add('العملاء',(C.customers||[]).filter(hit).slice(0,5),x=>({label:x.name,sub:x.phone||'',view:'cust',term:x.name}));
-  if(C&&can('supp'))add('الموردون',(C.suppliers||[]).filter(hit).slice(0,5),x=>({label:x.name,sub:x.phone||'',view:'supp',term:x.name}));
+  if(C&&(can('cust')||can('supp'))){
+    const seen=new Map();
+    const pushP=(x,view)=>{const k=(x.name||'').trim().toLowerCase();if(!k)return;if(seen.has(k)){if(view==='cust')seen.get(k).view='cust';return}seen.set(k,{label:x.name,sub:x.phone||'',view,term:x.name})};
+    if(can('cust'))(C.customers||[]).filter(hit).forEach(x=>pushP(x,'cust'));
+    if(can('supp'))(C.suppliers||[]).filter(hit).forEach(x=>pushP(x,'supp'));
+    add('الأطراف',[...seen.values()].slice(0,8),x=>x);
+  }
   try{
     if(can('sales')){const r=await sb.from('sales_invoices').select('id,number').ilike('number','%'+q+'%').limit(5);if(!r.error)add('فواتير البيع',r.data||[],x=>({label:x.number,sub:'',view:'sales',term:x.number}))}
     if(can('purch')){const r=await sb.from('purchase_invoices').select('id,number').ilike('number','%'+q+'%').limit(5);if(!r.error)add('فواتير الشراء',r.data||[],x=>({label:x.number,sub:'',view:'purch',term:x.number}))}
@@ -778,6 +786,11 @@ async function mfaVerifyCode(factorId){
   if(e1){toast('تعذر بدء التحقق: '+e1.message);return}
   const{error:e2}=await sb.auth.mfa.verify({factorId,challengeId:ch.id,code});
   if(e2){toast('الكود غلط أو منتهي، جرّب تاني');return}
+  // الجهاز المتذكر (7 أيام، جهاز واحد لكل مستخدم)
+  const tok=newTrustTok();
+  const{error:e3}=await sb.rpc('trust_device',{p_token:tok});
+  if(e3)toast('تم التحقق، بس الجهاز متفكرش: '+e3.message);
+  else{try{localStorage.setItem(TRUST_KEY,tok)}catch(_){}}
   mfaClose();
   await boot();
 }
@@ -788,6 +801,7 @@ async function mfaGate(){
   const{data:f}=await sb.auth.mfa.listFactors();
   const verified=(f?.totp||[]).find(x=>x.status==='verified');
   if(verified){
+    try{if(trustTok()&&(await sb.rpc('device_trust_status')).data===true)return false}catch(_){}
     mfaScreen(`<div class="card form-card"><div class="card-title"><b>التحقق الثنائي</b><span class="muted">اكتب الكود اللي في تطبيق Authenticator</span></div><input id="mfaCode" inputmode="numeric" maxlength="8" placeholder="000000" style="text-align:center;letter-spacing:6px;font-size:20px"><button class="btn" style="width:100%;margin-top:10px" onclick="mfaVerifyCode('${verified.id}')">تأكيد</button><button class="btn s" style="width:100%;margin-top:8px" onclick="logout()">خروج</button></div>`);
     return true;
   }
@@ -1969,7 +1983,10 @@ function coCardHtml(s){
     <div class="co-sec"><h4>البيانات الأساسية</h4>
       <div class="fm-grid">
         <label class="fm-f"><span>اسم الشركة</span><input id="sc" value="${e(s.company_name)}"${dis}></label>
-        <label class="fm-f"><span>بادئة الفاتورة</span><input id="sp" value="${e(s.invoice_prefix)}"${dis}></label>
+        <label class="fm-f"><span>بادئة فاتورة البيع</span><input id="sp_s" value="${e(s.prefix_sales)}"${dis}></label>
+        <label class="fm-f"><span>بادئة فاتورة الشراء</span><input id="sp_p" value="${e(s.prefix_purchase)}"${dis}></label>
+        <label class="fm-f"><span>بادئة مرتجع البيع</span><input id="sp_sr" value="${e(s.prefix_sales_return)}"${dis}></label>
+        <label class="fm-f"><span>بادئة مرتجع الشراء</span><input id="sp_pr" value="${e(s.prefix_purchase_return)}"${dis}></label>
         <label class="fm-f"><span>الرقم الضريبي</span><input id="stn" value="${e(s.tax_number)}"${dis}></label>
       </div></div>
     <div class="co-sec"><h4>الضريبة والمخزون</h4>
@@ -1982,7 +1999,7 @@ function coCardHtml(s){
       ${adm?`<button onclick="saveCoSettings()">حفظ الإعدادات</button>`:''}</div>
   </div>`;
 }
-function saveCoSettings(){return act(async()=>{await upd('company_settings',1,{company_name:v('sc'),invoice_prefix:v('sp'),tax_number:v('stn'),negative_stock:$('#sn').checked,tax_enabled:$('#ste').checked,tax_pct:n('sx'),sales_discount_max_pct:n('sdm')});await refreshCo()})}
+function saveCoSettings(){return act(async()=>{await upd('company_settings',1,{company_name:v('sc'),prefix_sales:v('sp_s'),prefix_purchase:v('sp_p'),prefix_sales_return:v('sp_sr'),prefix_purchase_return:v('sp_pr'),tax_number:v('stn'),negative_stock:$('#sn').checked,tax_enabled:$('#ste').checked,tax_pct:n('sx'),sales_discount_max_pct:n('sdm')});await refreshCo()})}
 
 // ----- تحديث التطبيق لكل المستخدمين -----
 const APP_SEEN_KEY='erp_refresh_seen';
@@ -2147,6 +2164,7 @@ function applyDialect(root){
     if(t.nodeValue!==out)t.nodeValue=out;
   }
 }
+async function setDialect(x){try{localStorage.setItem('erp_dialect',x)}catch{}await R();applyDialect(document.getElementById('app'))}
 function toggleDialect(){
   const cur=dialectMode();
   const opts=[['eg','عامية مصرية'],['msa','فصحى'],['en','English']];
