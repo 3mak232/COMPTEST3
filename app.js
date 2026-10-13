@@ -357,8 +357,8 @@ function openMobileNav(){const s=document.querySelector('.sidebar');const o=docu
 function closeMobileNav(){const s=document.querySelector('.sidebar');const o=document.querySelector('.mobile-overlay');if(s)s.classList.remove('open');if(o)o.classList.remove('open');document.body.classList.remove('menu-open')}
 // --- Enterprise UI layer ---
 const navOld = [['dash','الرئيسية'],['prod','الأصناف'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلام المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','التحصيل والمدفوعات'],['exp','المصروفات'],['cash','الخزينة والبنوك'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','التحويلات المخزنية'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الموارد البشرية'],['prl','المرتبات'],['period','الفترات والإقفال'],['org','الفروع ومراكز التكلفة'],['trace','تتبع المخزون / MRP'],['data','استيراد وتصدير'],['appr','الاعتمادات'],['taxdoc','المستندات الضريبية'],['users','المستخدمون'],['audit','سجل العمليات'],['health','فحص الجاهزية'],['int','التكاملات'],['set','الإعدادات والإدارة']];
-const NAV2=[...navOld, ...NAV.filter(x=>['chk','jr','rep'].includes(x[0])), ['profit','الأرباح بالتفاصيل'], ['bud','الموازنة والفعلي']];
-const ROLE2={admin:'*',accountant:['dash','prod','cust','supp','sales','quo','ord','dn','ret','purch','po','grn','pay','chk','exp','bud','cash','bank','trf','stk','price','comm','asset','hr','emp','prl','rep','profit','jr','taxdoc','trace'],sales:['dash','prod','cust','sales','quo','ord','dn','ret','price','comm'],store:['dash','prod','po','grn','trf','stk','trace']};
+const NAV2=[...navOld, ...NAV.filter(x=>['chk','jr','rep','shareholders'].includes(x[0])), ['profit','الأرباح بالتفاصيل'], ['bud','الموازنة والفعلي']];
+const ROLE2={admin:'*',accountant:['dash','prod','cust','supp','sales','quo','ord','dn','ret','purch','po','grn','pay','chk','exp','bud','cash','bank','trf','stk','price','comm','asset','hr','emp','prl','rep','profit','jr','taxdoc','trace','appr','shareholders'],sales:['dash','prod','cust','sales','quo','ord','dn','ret','price','comm'],store:['dash','prod','po','grn','trf','stk','trace']};
 P.admin='*'; P.accountant=ROLE2.accountant; P.sales=ROLE2.sales; P.store=ROLE2.store;
 NAV.splice(0,NAV.length,...NAV2);
 const HIDDEN_MODULES=new Set(['mfg','pos','proj']);
@@ -369,7 +369,7 @@ const NAV_GROUPS=[
   ['المشتريات',['purch','po','grn'],'purch'],
   ['المخزون',['prod','whs','trf','stk','trace'],'inventory'],
   ['الخزينة والبنوك',['cash','bank','chk','pay','exp'],'treasury'],
-  ['المحاسبة والتقارير',['profit','bud','stmt','jr','rep','asset','taxdoc'],'accounting'],
+  ['المحاسبة والتقارير',['profit','bud','stmt','jr','rep','asset','taxdoc','shareholders'],'accounting'],
   ['الموظفون',['emp','hr','prl'],'hr'],
   ['الإعدادات والإدارة',['set'],'admin']
 ];
@@ -808,7 +808,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.93';
+const APP_VERSION='v1.94';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
