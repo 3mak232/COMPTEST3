@@ -756,7 +756,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.88';
+const APP_VERSION='v1.90';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -952,7 +952,8 @@ document.addEventListener('click',ev=>{if(!ev.target.closest('.top-search'))gsHi
 
 // ----- MFA للأدمن والمطور (v1.68) -----
 function mfaScreen(html){
-  document.body.insertAdjacentHTML('beforeend',`<div id="mfaBg" style="position:fixed;inset:0;background:var(--bg,#fff);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px"><div style="max-width:420px;width:100%">${html}</div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div id="mfaBg" class="mfa-bg"><div class="mfa-box">${html}</div></div>`);
+  setTimeout(()=>document.getElementById('mfaCode')?.focus(),60);
 }
 function mfaClose(){const m=document.getElementById('mfaBg');if(m)m.remove()}
 async function mfaSignOut(){mfaClose();try{await logout()}catch(_){location.reload()}}
@@ -979,12 +980,12 @@ async function mfaGate(){
   const verified=(f?.totp||[]).find(x=>x.status==='verified');
   if(verified){
     try{if(trustTok()&&(await sb.rpc('device_trust_status')).data===true)return false}catch(_){}
-    mfaScreen(`<div class="card form-card"><div class="card-title"><b>التحقق الثنائي</b><span class="muted">اكتب الكود اللي في تطبيق Authenticator</span></div><input id="mfaCode" inputmode="numeric" maxlength="8" placeholder="000000" style="text-align:center;letter-spacing:6px;font-size:20px"><button class="btn" style="width:100%;margin-top:10px" onclick="mfaVerifyCode('${verified.id}')">تأكيد</button><button class="btn s" style="width:100%;margin-top:8px" onclick="mfaSignOut()">خروج</button></div>`);
+    mfaScreen(`<div class="mfa-card"><div class="mfa-ic">${ico('lockkey')}</div><h2 class="mfa-t">التحقق الثنائي</h2><p class="mfa-d">اكتب الكود المكون من 6 أرقام من تطبيق Authenticator</p><input id="mfaCode" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="000000" onkeydown="if(event.key==='Enter')mfaVerifyCode('${verified.id}')"><button class="btn mfa-btn" onclick="mfaVerifyCode('${verified.id}')">تأكيد الدخول</button><button class="btn soft mfa-btn" onclick="mfaSignOut()">تسجيل الخروج</button></div>`);
     return true;
   }
   const{data:en,error:e2}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'ERP Authenticator'});
   if(e2){toast('تعذر تفعيل MFA: '+e2.message);return true}
-  mfaScreen(`<div class="card form-card"><div class="card-title"><b>فعّل التحقق الثنائي</b><span class="muted">مطلوب للأدمن. افتح تطبيق Authenticator (Google/Microsoft) وامسح الكود، أو اكتب المفتاح يدوياً.</span></div><div style="text-align:center"><img alt="QR" src="${en.totp.qr_code}" style="max-width:200px;width:100%;background:#fff;padding:8px;border-radius:8px"></div><p class="muted" style="word-break:break-all;font-size:12px">المفتاح: ${e(en.totp.secret)}</p><input id="mfaCode" inputmode="numeric" maxlength="8" placeholder="الكود من التطبيق" style="text-align:center;letter-spacing:6px;font-size:20px"><button class="btn" style="width:100%;margin-top:10px" onclick="mfaVerifyCode('${en.id}')">تأكيد وتفعيل</button><button class="btn s" style="width:100%;margin-top:8px" onclick="mfaSignOut()">خروج</button></div>`);
+  mfaScreen(`<div class="mfa-card"><div class="mfa-ic">${ico('lockkey')}</div><h2 class="mfa-t">فعّل التحقق الثنائي</h2><p class="mfa-d">مطلوب لحساب الأدمن. افتح تطبيق Authenticator (Google أو Microsoft) وامسح الكود، أو اكتب المفتاح يدوياً.</p><div class="mfa-qr"><img alt="QR" src="${en.totp.qr_code}"></div><p class="mfa-key">${e(en.totp.secret)}</p><input id="mfaCode" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="الكود من التطبيق" onkeydown="if(event.key==='Enter')mfaVerifyCode('${en.id}')"><button class="btn mfa-btn" onclick="mfaVerifyCode('${en.id}')">تأكيد وتفعيل</button><button class="btn soft mfa-btn" onclick="mfaSignOut()">تسجيل الخروج</button></div>`);
   return true;
 }
 async function boot(){const{data:{user}}=await sb.auth.getUser();
@@ -3528,3 +3529,20 @@ login=async function(){await clearLocalData();return _login157()};
 const _logout157=logout;
 logout=async function(){const r=await _logout157();await clearLocalData();return r};
 
+
+/* v1.90: زرار Excel موحد على كل الكروت اللي فيها جداول (بدل ما يتكتب في كل صفحة لوحدها) */
+function addXlButtons(){
+  document.querySelectorAll('.page .card').forEach(c=>{
+    if(c.dataset.xl||c.classList.contains('form-card')||c.classList.contains('np')||c.classList.contains('report-cards'))return;
+    if(!c.querySelector('table'))return;
+    const t=c.querySelector('.card-title');
+    if(!t||t.querySelector('.xl-btn')||c.querySelector('button[onclick="exportCard(this)"]'))return;
+    c.dataset.xl='1';
+    t.insertAdjacentHTML('beforeend','<button type="button" class="btn soft sm xl-btn" onclick="exportCard(this)">'+ico('save')+' Excel</button>');
+  });
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const app=document.getElementById('app');if(!app)return;
+  let tm=null;
+  new MutationObserver(()=>{clearTimeout(tm);tm=setTimeout(addXlButtons,120)}).observe(app,{childList:true,subtree:true});
+});
