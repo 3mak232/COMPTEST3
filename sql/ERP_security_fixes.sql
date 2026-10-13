@@ -71,3 +71,22 @@ COMMIT;
 -- تحقق بعد التنفيذ: المفروض يرجعوا صفوف للحذف للأدمن بس
 -- select tablename, policyname, cmd, qual from pg_policies
 -- where schemaname='public' and tablename in ('parties','fiscal_periods','tax_documents') order by 1,2;
+
+-- ============================================================
+-- 7) قفل role_default_perms على الحسابات الفعّالة بس. آمن في أي وقت.
+-- ============================================================
+DROP POLICY IF EXISTS rdp_select ON public.role_default_perms;
+CREATE POLICY rdp_select ON public.role_default_perms FOR SELECT TO authenticated
+  USING (auth_role() IS NOT NULL);
+
+-- ============================================================
+-- 8) قفل resolve_login عن الزوار. ترتيب مهم، ماينفذش إلا بعد:
+--    أ) نشر دالة login-with-identifier (supabase functions deploy ... --no-verify-jwt)
+--    ب) نشر app.js الجديد اللي بيكلم الدالة دي
+-- لو اتنفذ قبلهم، تسجيل الدخول بالاسم والموبايل هيقع للكل.
+-- ============================================================
+-- REVOKE EXECUTE ON FUNCTION public.resolve_login(text) FROM PUBLIC, anon, authenticated;
+-- GRANT EXECUTE ON FUNCTION public.resolve_login(text) TO service_role;
+--
+-- تحقق: المفروض false
+-- SELECT has_function_privilege('anon', 'public.resolve_login(text)', 'EXECUTE');

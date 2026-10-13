@@ -777,8 +777,8 @@ function _loginScreen(){$('#app').innerHTML=lgShell(`<div class="lg-head"><span 
 function _inactiveScreen(){$('#app').innerHTML=lgShell(`<div class="lg-head"><span class="lg-eyebrow">خطوة واحدة متبقية</span><h2>الحساب بانتظار التفعيل</h2><p>سيتطلب الحساب تفعيل المدير قبل استخدام النظام.</p></div><button class="lg-submit" onclick="logout()">خروج</button>`)}
 function lgTogglePw(){const i=document.getElementById('lp');if(!i)return;const show=i.type==='password';i.type=show?'text':'password';const b=document.querySelector('.lg-eye');if(b)b.textContent=show?'إخفاء':'إظهار'}
 
-async function resolveLoginEmail(id){id=String(id||'').trim();if(!id)return '';if(id.includes('@'))return id.toLowerCase();const{data,error}=await sb.rpc('resolve_login',{p_identifier:id});if(error)throw error;return data||''}
-async function login(){return withLoading(async()=>{const email=await resolveLoginEmail(v('lu'));if(!email)throw Error('Invalid login credentials');const{error}=await sb.auth.signInWithPassword({email,password:v('lp')});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
+async function signInWithIdentifier(id,password){const{data,error}=await sb.functions.invoke('login-with-identifier',{body:{identifier:String(id||'').trim(),password:String(password||'')}});if(error||!data?.access_token)throw Error('Invalid login credentials');const{error:se}=await sb.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});if(se)throw se}
+async function login(){return withLoading(async()=>{await signInWithIdentifier(v('lu'),v('lp'));await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان')}
 async function logout(){return withLoading(async()=>{await sb.auth.signOut();me=null;localStorage.removeItem('erp_v_view');view='dash';await R()},'جاري تسجيل الخروج...','جارٍ إنهاء الجلسة بأمان')}
 
 // ----- قفل الموقع + خروج كل الجلسات (v1.61) -----
@@ -2083,7 +2083,7 @@ async function login(){
   loginMsg('');
   if(!email||!pass)return loginMsg('اكتب البريد الإلكتروني وكلمة المرور');
   try{
-    await withLoading(async()=>{const em=await resolveLoginEmail(email);if(!em)throw Error('Invalid login credentials');const{error}=await sb.auth.signInWithPassword({email:em,password:pass});if(error)throw error;await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان');
+    await withLoading(async()=>{await signInWithIdentifier(email,pass);await boot()},'جاري تسجيل الدخول...','جارٍ الاتصال بالنظام بأمان');
   }catch(x){
     const m=String(x?.message||x?.error_description||x||'');
     if(/invalid login|invalid_credentials|invalid.*(credential|password)/i.test(m))return loginMsg('البريد الإلكتروني أو كلمة المرور غلط');
