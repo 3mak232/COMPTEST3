@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>كتالوج نظام ERP</title>
+<style>
+:root{--ink:#101828;--muted:#667085;--line:#e4e7ec;--brand:#2563eb;--bg:#f8fafc;--card:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ink:#f2f4f7;--muted:#98a2b3;--line:#344054;--bg:#0c111d;--card:#101828;color-scheme:dark}}
+:root[data-theme="dark"]{--ink:#f2f4f7;--muted:#98a2b3;--line:#344054;--bg:#0c111d;--card:#101828;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:32px 16px}
+header{padding:28px 0 8px}
+h1{margin:0 0 6px;font-size:30px}
+h2{font-size:20px;margin:28px 0 12px}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card b{display:block;margin-bottom:6px}
+ul{margin:0;padding-inline-start:20px}
+li{margin:4px 0}
+.tag{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:2px 10px;font-size:12px;margin:2px}
+footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>نظام ERP لإدارة الحسابات والمخازن</h1>
+    <p class="muted">نظام عربي متكامل للمبيعات والمشتريات والمخازن والحسابات والتقارير، يشتغل من المتصفح على الكمبيوتر والموبايل.</p>
+  </header>
+
+  <h2>الوحدات الأساسية</h2>
+  <div class="grid">
+    <div class="card"><b>المبيعات والمشتريات</b><ul><li>فواتير بيع وشراء</li><li>مرتجعات بيع وشراء</li><li>أوامر شراء واستلام بضاعة</li><li>أذونات تسليم</li><li>عروض أسعار وأوامر بيع</li></ul></div>
+    <div class="card"><b>المخازن والأصناف</b><ul><li>أصناف متعددة المخازن والفروع</li><li>تتبع التشغيلات والـ Serials</li><li>تقييم المخزون بمتوسط التكلفة</li><li>تنبيهات الحد الأدنى</li><li>باركود بالكاميرا من الموبايل</li></ul></div>
+    <div class="card"><b>الحسابات والخزينة</b><ul><li>خزينة وبنوك وتحويلات بين الحسابات</li><li>شيكات</li><li>قيود يومية يدوية</li><li>مراكز تكلفة وتتبع المصروفات</li><li>تسويات بنكية</li></ul></div>
+    <div class="card"><b>الأطراف والموظفين</b><ul><li>العملاء والموردين وكشوف الحساب</li><li>الموظفين والرواتب والمكافآت والجزاءات</li><li>العطلات الرسمية</li></ul></div>
+  </div>
+
+  <h2>التقارير والتحليلات</h2>
+  <div class="grid">
+    <div class="card"><b>تقارير مالية</b><ul><li>ميزان المراجعة</li><li>المركز المالي</li><li>قائمة الدخل</li><li>التدفق النقدي</li></ul></div>
+    <div class="card"><b>تحليل الأرباح</b><ul><li>الأرباح بالتفاصيل لفترة محددة</li><li>الأرباح حسب الصنف واليوم</li><li>المصروفات حسب البند</li></ul></div>
+    <div class="card"><b>الموازنة والفعلي</b><ul><li>موازنة شهرية لكل تصنيف مصروفات</li><li>مقارنة الفعلي بالموازنة ونسبة الصرف</li></ul></div>
+    <div class="card"><b>التصدير</b><ul><li>تصدير أي جدول لـ Excel بزرار واحد</li><li>إرسال الفاتورة على واتساب برابط جاهز</li></ul></div>
+  </div>
+
+  <h2>الأمان والصلاحيات</h2>
+  <div class="grid">
+    <div class="card"><b>صلاحيات حسب الدور</b><ul><li>أدوار: أدمن، محاسب، مبيعات، مخزن</li><li>صلاحيات مخصصة لكل مستخدم</li></ul></div>
+    <div class="card"><b>حماية الحساب</b><ul><li>تحقق ثنائي (MFA) للأدمن</li><li>تذكّر الجهاز الموثوق لمدة محددة</li><li>قفل الموقع وخروج كل المستخدمين</li></ul></div>
+    <div class="card"><b>النسخ الاحتياطي</b><ul><li>نسخة كاملة للبيانات وإمكانية الاسترجاع</li><li>سجل تدقيق للعمليات</li></ul></div>
+  </div>
+
+  <h2>المزايا التقنية</h2>
+  <p><span class="tag">عربي كامل (RTL)</span><span class="tag">إنجليزي</span><span class="tag">متوافق مع الموبايل</span><span class="tag">بيانات منفصلة لكل عميل</span><span class="tag">بدون تثبيت</span></p>
+
+  <footer>
+    هذا الكتالوج يعرض الإمكانيات الموجودة في الإصدار الحالي فقط. الوحدات الأخرى (نقاط البيع والتصنيع والمشاريع) موجودة في الكود لكنها غير معروضة في الإصدار الحالي.
+  </footer>
+</div>
+</body>
+</html>
