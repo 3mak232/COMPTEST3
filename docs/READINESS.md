@@ -57,9 +57,17 @@
 - `ERP_security_fixes.sql` بالكامل: إعادة تسمية العمود، ودالة `app_version`، وحذف `app_refresh_token`، وتدوير القيمة، والتشديد على `parties` و`fiscal_periods` و`tax_documents`.
 - نشر `app.js` الجديد على `main`.
 
-**قرارات وتنفيذ مفتوح:**
-- `resolve_login`: قرار الحل **Edge Function** (`supabase/functions/login-with-identifier`). الدالة بتحل الاسم أو الموبايل لإيميل على السيرفر، وبتسجل الدخول، وبترجع الجلسة بس، فالإيميل مابيوصلش للمتصفح. الكود اتعمل ومش منشور. الترتيب: نشر الدالة، ثم نشر `app.js`، ثم القسم 8 في `ERP_security_fixes.sql` (قفل `resolve_login` عن الزوار).
-- `role_default_perms` (`rdp_select`): القسم 7 في `ERP_security_fixes.sql` بيقفلها على الحسابات الفعّالة بس. لسه ما اتنفذش.
+**حالة التنفيذ (الإصدار v1.92):**
+- ✅ `rdp_select` مقفول على الحسابات الفعّالة (القسم 7).
+- ✅ دالة `login-with-identifier` اتنشرت على Supabase، وتسجيل الدخول بالاسم والموبايل والإيميل اتجرب ونجح.
+- ⏳ قفل `resolve_login` عن الزوار (القسم 8): لسه ما اتنفذش، ولازم بعد نشر `app.js` الجديد على `main`.
+- ⏳ دمج فرع `security/login-edge-function` في `main` ونشر `app.js`: لسه.
+
+**ملفات الأمان:**
+- `sql/ERP_security_final.sql`: الحالة النهائية لكل الإصلاحات في ملف واحد. الأقسام A إلى E اتنفذت بشكل تراكمي، والقسم F (قفل `resolve_login`) مستنى نشر `app.js`.
+- `sql/ERP_security_fixes.sql`: النسخة المرحلية اللي اتنفذت خطوة بخطوة. الملف الرئيسي للأمان هو `ERP_security_final.sql`.
+- `sql/ERP_rls_audit.sql`: فحص الصلاحيات (بيقرا بس).
+- `supabase/functions/login-with-identifier/index.ts`: دالة الدخول (اتنشرت من داشبورد Supabase مع إطفاء Verify JWT).
 - الدور `developer` بيتحول لـ`admin` وبيتجاوز القفل، لازم حسابه يكون بـ MFA وكلمة سر قوية.
 
 **ترتيب التنفيذ (تم):** SQL الجزء الأول، ثم نشر `app.js`، ثم الحذف والتدوير والتشديد.
