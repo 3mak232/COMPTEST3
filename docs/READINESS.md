@@ -60,11 +60,12 @@
 **حالة التنفيذ (الإصدار v1.92):**
 - ✅ `rdp_select` مقفول على الحسابات الفعّالة (القسم 7).
 - ✅ دالة `login-with-identifier` اتنشرت على Supabase، وتسجيل الدخول بالاسم والموبايل والإيميل اتجرب ونجح.
-- ⏳ قفل `resolve_login` عن الزوار (القسم 8): لسه ما اتنفذش، ولازم بعد نشر `app.js` الجديد على `main`.
-- ⏳ دمج فرع `security/login-edge-function` في `main` ونشر `app.js`: لسه.
+- ✅ أصلحنا مشكلة CORS: الدالة كانت بتقفل header `x-device-trust` اللي التطبيق بيبعته (ميزة الجهاز الموثوق).
+- ✅ دمج `security/login-edge-function` في `main` ونشر `app.js` (commit `e9041fd`).
+- ✅ قفل `resolve_login` عن الزوار (القسم F): بعد ما تأكدنا إن الدخول شغال.
 
 **ملفات الأمان:**
-- `sql/ERP_security_final.sql`: الحالة النهائية لكل الإصلاحات في ملف واحد. الأقسام A إلى E اتنفذت بشكل تراكمي، والقسم F (قفل `resolve_login`) مستنى نشر `app.js`.
+- `sql/ERP_security_final.sql`: الحالة النهائية لكل الإصلاحات في ملف واحد. الأقسام A إلى F اتنفذت بشكل تراكمي على المشروع الحالي. القسم F تم بعد ما الدخول اتأكد.
 - `sql/ERP_security_fixes.sql`: النسخة المرحلية اللي اتنفذت خطوة بخطوة. الملف الرئيسي للأمان هو `ERP_security_final.sql`.
 - `sql/ERP_rls_audit.sql`: فحص الصلاحيات (بيقرا بس).
 - `supabase/functions/login-with-identifier/index.ts`: دالة الدخول (اتنشرت من داشبورد Supabase مع إطفاء Verify JWT).

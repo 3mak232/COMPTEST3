@@ -5,7 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-device-trust",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -47,7 +47,10 @@ Deno.serve(async (req) => {
   const { data: email, error: resolveError } = await admin.rpc("resolve_login", {
     p_identifier: identifier,
   });
-  if (resolveError || !email) return json(FAIL, 401);
+  if (resolveError || !email) {
+    console.error("resolve failed", { kind: identifier.includes("@") ? "email" : "other", rpcError: resolveError?.message ?? null, emptyResult: !email });
+    return json(FAIL, 401);
+  }
 
   // 2) تسجيل الدخول نفسه، والرد بالجلسة بس
   const auth = createClient(url, publicKey, {
@@ -57,7 +60,10 @@ Deno.serve(async (req) => {
     email: String(email),
     password,
   });
-  if (signInError || !data.session) return json(FAIL, 401);
+  if (signInError || !data.session) {
+    console.error("signin failed", { authError: signInError?.message ?? null, status: signInError?.status ?? null });
+    return json(FAIL, 401);
+  }
 
   return json({
     access_token: data.session.access_token,

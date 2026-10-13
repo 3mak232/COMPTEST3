@@ -81,8 +81,8 @@ CREATE POLICY rdp_select ON public.role_default_perms FOR SELECT TO authenticate
 --    2) تنشر app.js اللي بيكلمها
 --    3) تتأكد إن تسجيل الدخول بالاسم والموبايل شغال
 -- ============================================================
--- REVOKE EXECUTE ON FUNCTION public.resolve_login(text) FROM PUBLIC, anon, authenticated;
--- GRANT EXECUTE ON FUNCTION public.resolve_login(text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.resolve_login(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_login(text) TO service_role;
 
 -- ============================================================
 -- تحقق بعد التشغيل
