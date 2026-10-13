@@ -554,13 +554,30 @@ async function shareholdersView(){
   const reqHtml=(pendingHtml+myHtml)||'<div class="empty">لا توجد طلبات</div>';
   const reqCount=isAdm?pending.length:mine.length;
   const listHtml=S.length?T(['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي',''],rows):'<div class="empty">لا يوجد مساهمون بعد</div>';
-  window._shReqHtml=reqHtml; window._shListHtml=listHtml;
+  window._shReqHtml=reqHtml; window._shListHtml=listHtml; window._shData={S,M,avgBy,runs,PN};
   return `${sectionHead('المساهمون','رأس المال والأرباح الشهرية. تعديل البيانات من المحاسب بيحتاج موافقة الأدمن.')}
-  <div class="card form-card"><div class="row"><button class="btn" onclick="shEdit(null)">+ إضافة مساهم</button><button class="btn soft" onclick="shShowRequests()">الطلبات (${reqCount})</button><button class="btn soft" onclick="shShowList()">المساهمون الحاليون (${S.length})</button></div>${adminTools}</div>
+  <div class="card form-card"><div class="row"><button class="btn" onclick="shEdit(null)">+ إضافة مساهم</button><button class="btn soft" onclick="shShowRequests()">الطلبات (${reqCount})</button><button class="btn soft" onclick="shShowList()">المساهمون الحاليون (${S.length})</button><button class="btn soft" onclick="shPrintMembers()">طباعة بيانات المساهمين</button><button class="btn soft" onclick="shPrintDistributions()">طباعة توزيعات الأرباح</button></div>${adminTools}</div>
   <div class="card"><h3>توزيعات الأرباح</h3>${runsHtml}</div>`;
 }
 function shShowRequests(){showModal(`<h3>طلبات التعديل</h3>${window._shReqHtml||''}`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>')}
 function shShowList(){showModal(`<h3>المساهمون الحاليون</h3>${window._shListHtml||''}`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>')}
+const SH_PROFIT_TYPES={profit_reinvest:'إعادة استثمار',profit_withdraw:'ربح مستحق للصرف',profit_payout:'صرف ربح',loss:'خسارة'};
+function shPrintMembers(){
+  const d=window._shData;if(!d)return toast('حدّث الصفحة وجرّب تاني');
+  let tc=0,td=0;
+  const rows=d.S.map(x=>{const b=shBal(d.M,x.id);tc+=b.cap;td+=b.due;return `<tr><td>${e(x.name)}</td><td>${e(x.phone||'—')}</td><td>${e(x.email||'—')}</td><td>${e(shModeLabel(x.profit_mode))}</td><td>${x.active?'مفعّل':'موقوف'}</td><td>${money(b.cap)}</td><td>${money(b.due)}</td></tr>`}).join('');
+  printHtml('بيانات المساهمين',`<h2>بيانات المساهمين</h2><p class="muted">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p><table><tr><th>الاسم</th><th>الموبايل</th><th>الإيميل</th><th>طريقة الربح</th><th>الحالة</th><th>رأس المال</th><th>المستحق للصرف</th></tr>${rows}<tr class="tot"><td colspan="5">الإجمالي</td><td>${money(tc)}</td><td>${money(td)}</td></tr></table>`);
+}
+function shPrintDistributions(){
+  const d=window._shData;if(!d)return toast('حدّث الصفحة وجرّب تاني');
+  const name=id=>e(d.S.find(x=>x.id===id)?.name||'—');
+  const runsRows=d.runs.map(r=>`<tr><td>${e(String(r.month).slice(0,7))}</td><td>${money(r.net_profit)}</td><td>${money(r.total_avg_capital)}</td><td>${e(r.status==='Distributed'?'تم التوزيع':r.status==='Carried'?'مرحّل':'مستهلك')}</td></tr>`).join('');
+  const movs=d.M.filter(m=>SH_PROFIT_TYPES[m.type]).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const movRows=movs.map(m=>`<tr><td>${e(String(m.date).slice(0,10))}</td><td>${name(m.shareholder_id)}</td><td>${e(SH_PROFIT_TYPES[m.type])}</td><td>${money(m.amount)}</td></tr>`).join('');
+  printHtml('توزيعات الأرباح',`<h2>توزيعات الأرباح</h2><p class="muted">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
+    <h3>الشهور</h3><table><tr><th>الشهر</th><th>صافي الربح</th><th>متوسط رأس المال</th><th>الحالة</th></tr>${runsRows||'<tr><td colspan="4">لا توجد توزيعات</td></tr>'}</table>
+    <h3>تفاصيل الحركات</h3><table><tr><th>التاريخ</th><th>المساهم</th><th>النوع</th><th>المبلغ</th></tr>${movRows||'<tr><td colspan="4">لا توجد حركات أرباح</td></tr>'}</table>`);
+}
 function nameOf(S,id){const s=S.find(x=>x.id===id);return s?e(s.name):''}
 async function shEdit(id){
   const S=id?(await g('shareholders')).find(x=>x.id===id):null;
@@ -818,7 +835,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.96';
+const APP_VERSION='v1.97';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
