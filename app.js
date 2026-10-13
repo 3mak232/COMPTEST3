@@ -217,7 +217,6 @@ async function accountsView(){const A=await rpc('trial_balance',{});return `<h2>
 function journalForm(){const opts=C.accounts||[];let A=opts.length?opts:[];if(!A.length){alert('الحسابات يتم تحميلها داخل شاشة الحسابات.');return}$('#app').insertAdjacentHTML('beforeend',`<div id="jm" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:15px"><div class="card" style="width:min(760px,100%)"><h3>قيد يومية يدوي</h3><input id="jd" type="date" value="${new Date().toISOString().slice(0,10)}"><input id="jx" placeholder="البيان" style="width:55%"><div id="jl"></div><button class="s" onclick="addJournalRow()">+ سطر</button><button onclick="saveJournal()">حفظ القيد</button><button class="danger" onclick="$('#jm').remove()">إغلاق</button></div></div>`);for(let i=0;i<2;i++)addJournalRow()}
 function addJournalRow(){const el=$('#jl');if(!el)return;const A=C.accounts||[];const opts=A.map(a=>`<option value="${e(a.code)}">${e(a.code)} - ${e(a.name)}</option>`).join('');el.insertAdjacentHTML('beforeend',`<div class="row jrow"><select class="jacc">${opts}</select><input class="jdv" type="number" placeholder="مدين"><input class="jcv" type="number" placeholder="دائن"></div>`) }
 async function saveJournal(){const rows=[...document.querySelectorAll('.jrow')].map(r=>({account_code:r.querySelector('.jacc').value,debit:+r.querySelector('.jdv').value||0,credit:+r.querySelector('.jcv').value||0})).filter(x=>x.debit||x.credit);await act(async()=>{await rpc('create_manual_journal',{p_date:v('jd'),p_description:v('jx'),p_lines:rows});$('#jm').remove()})}
-async function ensureAccounts(){if(!C.accounts)C.accounts=await g('accounts','code')}
 async function employeesView(){const L=await g('employees','name');return `<h2>الموظفون</h2><div class="card np"><div class="row"><input id="en" placeholder="الاسم"><input id="ej" placeholder="الوظيفة"><input id="eh" placeholder="الهاتف"><input id="es" type="number" placeholder="المرتب"><input id="ed2" type="date"><button onclick="act(()=>ins('employees',{name:v('en'),job:v('ej'),phone:v('eh'),salary:n('es'),joining_date:v('ed2')||null}))">إضافة</button></div></div><div class="card">${T(['الاسم','الوظيفة','الهاتف','المرتب','الحالة'],L.map(x=>[e(x.name),e(x.job),e(x.phone),fmt(x.salary),x.active?'نشط':'موقوف']))}</div>`}
 async function loadPayrollAdjustments(){
   const emp=v('pe'),mon=v('pmo');
@@ -239,7 +238,6 @@ async function loadRet(){const s=v('rk')==='s',id=v('ri');const{data,error}=awai
 async function quotationsView(){const L=await g('quotations','date'),tot=cart.q.reduce((a,l)=>a+l.qty*l.price-l.discount,0);return `<h2>عروض الأسعار</h2><div class="card np"><div class="row"><select id="ip">${O(C.customers)}</select><select id="il">${O(C.products.filter(p=>p.active))}</select><input id="iq" type="number" value="1" style="width:80px"><input id="ir" type="number" placeholder="السعر"><input id="id" type="number" placeholder="خصم"><button class="s" onclick="addLine('q')">+ بند</button></div>${cartTable('q')}<p>الإجمالي: <b>${fmt(tot)}</b></p><input id="vu" type="date"><button onclick="act(async()=>{await rpc('create_quotation',{p_customer:v('ip'),p_valid:v('vu')||null,p_items:cart.q});cart.q=[]})">حفظ العرض</button></div><div class="card">${T(['رقم','التاريخ','العميل','صالح حتى','الحالة',''],L.reverse().map(x=>[e(x.number),x.date,e(by(C.customers,x.customer_id).name),x.valid_until||'',x.status,x.status==='Open'?`<button onclick="act(()=>rpc('quotation_to_order',{p_quo:'${x.id}',p_warehouse:'${(C.warehouses[0]||{}).id}'}))">تحويل لأمر بيع</button>`:'']))}</div>`}
 async function ordersView(){const L=await g('sales_orders','date');return `<h2>أوامر البيع</h2><div class="card np"><select id="oa">${O(C.accts)}</select><input id="op" type="number" placeholder="المدفوع عند التحويل"></div><div class="card">${T(['رقم','التاريخ','العميل','الحالة',''],L.reverse().map(x=>[e(x.number),x.date,e(by(C.customers,x.customer_id).name),x.status,x.status==='Confirmed'?`<button onclick="act(()=>rpc('order_to_invoice',{p_order:'${x.id}',p_paid:n('op'),p_account:n('op')>0?v('oa'):null,p_method:n('op')>0?'cash':'credit'}))">تحويل لفاتورة</button> <button class="s" onclick="act(()=>rpc('cancel_order',{p_order:'${x.id}'}))">إلغاء</button>`:'']))}</div>`}
 async function usersView(){const L=await g('profiles','created_at');return `<h2>المستخدمون</h2><div class="card">${T(['الاسم','البريد','الدور','مفعّل'],L.map(u=>[e(u.name),e(u.username),`<select onchange="act(()=>upd('profiles','${u.id}',{role:this.value}))">${['admin','accountant','sales','store'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select>`,`<input type="checkbox" ${u.active?'checked':''} ${u.id===me.id?'disabled':''} onchange="act(()=>upd('profiles','${u.id}',{active:this.checked}))">`]))}</div>`}
-function settingsLink(id,title,desc,icon=ico('gear')){return can(id)?`<button class="settings-tile" onclick="go('${id}')"><span class="settings-icon">${icon}</span><span><b>${title}</b><small>${desc}</small></span><span class="settings-arrow">‹</span></button>`:''}
 const sRow=(onclick,icon,title,desc)=>`<button class="st-row" onclick="${onclick}"><span class="st-ic">${icon}</span><span class="st-tx"><b>${title}</b><small>${desc}</small></span><span class="st-ch">‹</span></button>`;
 const sLink=(id,icon,title,desc)=>can(id)?sRow(`go('${id}')`,icon,title,desc):'';
 const sGroup=(cls,title,rows)=>{const body=rows.filter(Boolean).join('');return body?`<section class="st-group ${cls}"><h3>${title}</h3><div class="st-list">${body}</div></section>`:''};
@@ -399,7 +397,6 @@ window.addEventListener('offline',()=>{updateOnlineStatus();toast('انقطع ا
 
 function chip(text,kind='info'){return `<span class="chip ${kind}">${e(text)}</span>`}
 function sectionHead(title,sub=''){return `<div class="section-head"><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div></div>`}
-function actionBtn(label,fn,kind='primary'){return `<button class="btn ${kind}" onclick="${fn}">${label}</button>`}
 function money(x){return `<span class="money">${fmt(x)} ج.م</span>`}
 
 async function dash(){
@@ -756,7 +753,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.90';
+const APP_VERSION='v1.91';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1084,7 +1081,6 @@ function partyPick(k,id){
   document.getElementById('pkRes').innerHTML='';
   const s=document.getElementById('pkSel');s.innerHTML=partySelHtml(k,x);s.style.display='';
 }
-function stSearch(q){const cu=v('sk')==='c',box=document.getElementById('stRes');if(!box)return;q=(q||'').trim().toLowerCase();if(!q){box.innerHTML='';return}const list=(cu?C.customers:C.suppliers).filter(x=>[e(x.name),e(x.phone)].join(' ').toLowerCase().includes(q)).slice(0,8);box.innerHTML=list.length?list.map(x=>`<button type="button" class="doc-res-item" onclick="stPick('${x.id}')"><b>${e(x.name)}</b><small>${e(x.phone||'بدون رقم هاتف')}</small></button>`).join(''):'<div class="doc-res-empty">لا يوجد نتيجة</div>'}
 function stPick(id){const cu=v('sk')==='c',x=(cu?C.customers:C.suppliers).find(r=>r.id===id);if(!x)return;window._stp=id;const sel=document.getElementById('stSel');if(sel)sel.textContent=x.name;const box=document.getElementById('stRes');if(box)box.innerHTML='';const q=document.getElementById('sq2');if(q)q.value=''}
 function partyClear(k){
   window.ixParty[k]=null;
@@ -2232,7 +2228,6 @@ async function partyEdit(id){
       p_credit_limit:cu?n('ep_cl'):null,p_customer_terms:cu?(parseInt(v('ep_ct'))||0):null,p_supplier_terms:su?(parseInt(v('ep_st'))||0):null});
   },'حفظ');
 }
-function partyRole(id,role,on){return act(()=>rpc('set_party_role',{p_party:id,p_role:role,p_on:!!on,p_credit_limit:0,p_terms:0,p_opening:0}))}
 // مدخل الأطراف من القائمة (العملاء والموردين) — الموردين بيفتحوا تبويب الموردين
 const _legacy1=legacyHtml;
 legacyHtml=async function(){
