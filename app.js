@@ -554,13 +554,20 @@ async function shareholdersView(){
   const reqHtml=(pendingHtml+myHtml)||'<div class="empty">لا توجد طلبات</div>';
   const reqCount=isAdm?pending.length:mine.length;
   const listHtml=S.length?T(['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي',''],rows):'<div class="empty">لا يوجد مساهمون بعد</div>';
-  window._shReqHtml=reqHtml; window._shListHtml=listHtml; window._shData={S,M,avgBy,runs,PN};
+  window._shReqHtml=reqHtml; window._shListHtml=listHtml; window._shData={S,M,avgBy,runs,PN}; window._shRows=rows; window._shHeaders=['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي','']; window._shSearch=S.map(x=>`${x.name||''} ${x.phone||''} ${x.email||''}`.toLowerCase());
   return `${sectionHead('المساهمون','رأس المال والأرباح الشهرية. تعديل البيانات من المحاسب بيحتاج موافقة الأدمن.')}
   <div class="card form-card"><div class="row"><button class="btn" onclick="shEdit(null)">+ إضافة مساهم</button><button class="btn soft" onclick="shShowRequests()">الطلبات (${reqCount})</button><button class="btn soft" onclick="shShowList()">المساهمون الحاليون (${S.length})</button><button class="btn soft" onclick="shPrintMembers()">طباعة بيانات المساهمين</button><button class="btn soft" onclick="shPrintDistributions()">طباعة توزيعات الأرباح</button></div>${adminTools}</div>
   <div class="card"><h3>توزيعات الأرباح</h3>${runsHtml}</div>`;
 }
 function shShowRequests(){showModal(`<h3>طلبات التعديل</h3>${window._shReqHtml||''}`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>')}
-function shShowList(){showModal(`<h3>المساهمون الحاليون</h3>${window._shListHtml||''}`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>')}
+function shShowList(){showModal(`<h3>المساهمون الحاليون</h3><input id="shq" type="search" placeholder="بحث بالاسم أو الموبايل أو الإيميل" oninput="shFilterList()" style="width:100%;margin:6px 0 10px"><div id="shListBody">${window._shListHtml||''}</div>`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>',true)}
+function shFilterList(){
+  const q=(v('shq')||'').trim().toLowerCase();
+  const rows=window._shRows||[],txt=window._shSearch||[];
+  const keep=rows.filter((_,i)=>!q||(txt[i]||'').includes(q));
+  const box=document.getElementById('shListBody');if(!box)return;
+  box.innerHTML=keep.length?T(window._shHeaders,keep):'<div class="empty">لا توجد نتائج</div>';
+}
 const SH_PROFIT_TYPES={profit_reinvest:'إعادة استثمار',profit_withdraw:'ربح مستحق للصرف',profit_payout:'صرف ربح',loss:'خسارة'};
 function shPrintMembers(){
   const d=window._shData;if(!d)return toast('حدّث الصفحة وجرّب تاني');
@@ -835,7 +842,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.97';
+const APP_VERSION='v1.98';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -1548,11 +1555,11 @@ function ptPrintLS(key,title,sub){
 }
 
 // ---------- أدوات مشتركة: نوافذ منبثقة ----------
-function showModal(html,footer){
+function showModal(html,footer,wide){
   closeModal();
   const d=document.createElement('div');d.id='modalBg';d.className='modal-bg';
   d.onclick=ev=>{if(ev.target===d)closeModal()};
-  d.innerHTML=`<div class="modal-box" role="dialog">${html}<div class="modal-actions">${footer||''}<button class="btn s" onclick="closeModal()">إغلاق</button></div></div>`;
+  d.innerHTML=`<div class="modal-box${wide?' wide':''}" role="dialog">${html}<div class="modal-actions">${footer||''}<button class="btn s" onclick="closeModal()">إغلاق</button></div></div>`;
   document.body.appendChild(d);
 }
 function closeModal(){const m=document.getElementById('modalBg');if(m)m.remove();window._trDet=null;window._fmSave=null}

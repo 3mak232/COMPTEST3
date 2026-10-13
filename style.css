@@ -434,6 +434,7 @@ body{background:#f4f6fa}
 .modal-actions{padding-top:14px;border-top:1px solid #eef2f6;margin-top:18px;gap:10px}
 .modal-actions .btn{min-width:120px}
 .modal-box .tw{border:1px solid #eef2f6;border-radius:12px}
+.modal-box.wide{max-width:1100px;width:96vw}
 @media(max-width:780px){.modal-box{padding:16px;border-radius:16px;max-height:92vh}.modal-box .fm-grid{grid-template-columns:1fr}.modal-actions .btn{flex:1;min-width:0}}
 
 .co-card .co-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid #eef2f6;margin-bottom:18px}
