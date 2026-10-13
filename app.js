@@ -36,13 +36,13 @@ function toast(msg){const t=$('#toast');if(!t)return;t.textContent=msg;t.classLi
 function showPlaceholder(){const pg=document.querySelector('.page');if(pg)pg.innerHTML='<div class="page-loading"><div class="pl-spin"></div><p class="muted">جاري فتح الصفحة...</p></div>'}
 function go(vw){window.ixMode={};if(vw!==view){window._nav=window._nav||[];window._nav.push(view);if(window._nav.length>20)window._nav.shift()}view=vw;localStorage.setItem('erp_v_view',vw);closeMobileNav?.();showPlaceholder();return R('soft')}
 
-const P={admin:'*',accountant:['dash','prod','cust','supp','sales','purch','po','grn','dn','pay','exp','cash','trf','ret','quo','ord','stmt','emp','prl','asset','bank','price','rep','profit','bud','jr','stk','period','appr','chk','comm','taxdoc','org','health','audit'],sales:['dash','prod','cust','sales','dn','ret','quo','ord','stmt','price','comm','taxdoc','appr'],store:['dash','prod','purch','po','grn','dn','ret','trf','stk','mfg']};
+const P={admin:'*',accountant:['dash','prod','cust','supp','sales','purch','po','grn','dn','pay','exp','cash','trf','ret','quo','ord','stmt','emp','prl','asset','bank','price','rep','profit','bud','jr','stk','period','appr','shareholders','chk','comm','taxdoc','org','health','audit'],sales:['dash','prod','cust','sales','dn','ret','quo','ord','stmt','price','comm','taxdoc','appr'],store:['dash','prod','purch','po','grn','dn','ret','trf','stk','mfg']};
 const canMaster=()=>!!me&&['admin','accountant','store'].includes(me.role);
 const isAdminRole=()=>!!me&&me.role==='admin';
 const DISC_MAX_PCT={sales:5};
 const canBase=x=>me&&(P[me.role]==='*'||P[me.role].includes(x));
 const can=x=>{if(!me)return false;if(x==='cust')return canRaw('cust')||canRaw('supp');return canRaw(x)};const canRaw=x=>{if(x==='health'||x==='devset')return !!me.isDev;if(me.role==='admin')return true;if(!canBase(x))return false;if(customPermMode==='custom')return customPerms.has(x);return true};
-const NAV=[['dash','الرئيسية'],['prod','المنتجات'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','أذونات التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلامات المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','المدفوعات'],['exp','المصروفات'],['cash','الخزينة'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','تحويل مخزني'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الحضور والإجازات'],['prl','المرتبات'],['mfg','التصنيع'],['pos','نقطة البيع'],['proj','المشروعات والخدمات'],['org','الفروع ومراكز التكلفة'],['period','الفترات المالية'],['appr','الاعتمادات'],['chk','الشيكات'],['taxdoc','المستندات الضريبية'],['int','التكاملات'],['rep','التقارير'],['jr','الحسابات'],['health','فحص الجاهزية'],['users','المستخدمون'],['audit','سجل العمليات'],['set','الإعدادات والإدارة']];
+const NAV=[['dash','الرئيسية'],['prod','المنتجات'],['cust','الأطراف'],['supp','الموردون'],['sales','المبيعات'],['dn','أذونات التسليم'],['purch','المشتريات'],['po','أوامر الشراء'],['grn','استلامات المشتريات'],['ret','المرتجعات'],['quo','عروض الأسعار'],['ord','أوامر البيع'],['stmt','كشف الحساب'],['pay','المدفوعات'],['exp','المصروفات'],['cash','الخزينة'],['bank','البنوك والتسويات'],['whs','المخازن'],['trf','تحويل مخزني'],['stk','الجرد'],['price','قوائم الأسعار'],['comm','العمولات'],['asset','الأصول الثابتة'],['emp','الموظفون'],['hr','الحضور والإجازات'],['prl','المرتبات'],['mfg','التصنيع'],['pos','نقطة البيع'],['proj','المشروعات والخدمات'],['org','الفروع ومراكز التكلفة'],['period','الفترات المالية'],['appr','الاعتمادات'],['shareholders','المساهمون'],['chk','الشيكات'],['taxdoc','المستندات الضريبية'],['int','التكاملات'],['rep','التقارير'],['jr','الحسابات'],['health','فحص الجاهزية'],['users','المستخدمون'],['audit','سجل العمليات'],['set','الإعدادات والإدارة']];
 const rpc=async(f,a={})=>{const{data,error}=await sb.rpc(f,a);if(error)throw error;return data};
 const ins=async(t,o)=>{const{data,error}=await sb.from(t).insert(o).select().single();if(error)throw error;return data};
 const upd=async(t,id,o)=>{const{error}=await sb.from(t).update(o).eq('id',id);if(error)throw error};
@@ -527,6 +527,61 @@ async function chequeView(){const L=await g('cheques','due_date');return `${sect
 async function commissionView(){const [R,I,Cm]=await Promise.all([g('commission_rules','name'),g('sales_invoices','date'),g('sales_commissions','created_at')]);return `${sectionHead('العمولات','حساب عمولات البائعين بناءً على صافي المبيعات أو هامش الربح.')}
  <div class="card form-card"><div class="row"><input id="crn" placeholder="اسم القاعدة"><input id="crr" type="number" step="0.0001" placeholder="النسبة %"><select id="crb"><option value="net_sales">صافي المبيعات</option><option value="gross_profit">مجمل الربح</option></select><button class="btn" onclick="act(()=>ins('commission_rules',{name:v('crn'),rate:n('crr'),basis:v('crb')}))">إضافة قاعدة</button></div><hr><div class="row"><select id="cri">${I.filter(x=>x.status==='Posted').map(x=>`<option value="${x.id}">${e(x.number)} — ${money(x.total)}</option>`).join('')}</select><select id="crr2">${O(R)}</select><button class="btn soft" onclick="act(()=>rpc('calculate_sales_commission',{p_invoice:v('cri'),p_rule:v('crr2')}))">حساب عمولة</button></div></div><div class="card">${T(['الفاتورة','البائع','الأساس','العمولة','الحالة'],Cm.map(x=>[e(x.invoice_id),e(x.salesperson_id),money(x.basis_amount),money(x.amount),chip(x.status,x.status==='Paid'?'success':'warning')]))}</div>`}
 
+// ===== المساهمون (v1.93) =====
+const shMonthStart=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'};
+const shToday=()=>new Date().toISOString().slice(0,10);
+const shIsAdmin=()=>!!me&&(me.role==='admin'||me.role==='developer');
+function shBal(M,id){let cap=0,due=0;for(const m of M){if(m.shareholder_id!==id)continue;const a=+m.amount;if(m.type==='deposit'||m.type==='profit_reinvest')cap+=a;else if(m.type==='withdraw'||m.type==='loss')cap-=a;else if(m.type==='profit_withdraw')due+=a;else if(m.type==='profit_payout')due-=a}return{cap,due}}
+const shModeLabel=m=>m==='withdraw'?'يسحب الربح':'يضيف الربح لرأس المال';
+async function shareholdersView(){
+  const[S,M,avg,R,runs,st]=await Promise.all([g('shareholders','name'),g('shareholder_movements','date'),rpc('shareholder_avg_capital',{p_month:shMonthStart()}),g('shareholder_change_requests','requested_at'),g('shareholder_profit_runs','month'),g('shareholder_settings')]);
+  const avgBy=Object.fromEntries((avg||[]).map(x=>[x.shareholder_id,+x.avg_capital]));
+  const lossMode=(st[0]||{}).loss_mode||'proportional';
+  const pending=R.filter(x=>x.status==='Pending');
+  const rows=S.map(s=>{const b=shBal(M,s.id);return [
+    e(s.name)+(s.active?'':' <span class="chip">موقوف</span>'),e(s.phone||'—'),e(shModeLabel(s.profit_mode)),money(b.cap),money(b.due),money(avgBy[s.id]||0),
+    `<button class="btn soft" onclick="shEdit('${s.id}')">تعديل</button> <button class="btn soft" onclick="shMoveForm('${s.id}')">إيداع / سحب</button> <button class="btn soft" onclick="shPayForm('${s.id}')">صرف مستحق</button>`]});
+  const adminTools=shIsAdmin()?`<div class="row"><input type="month" id="shdm" value="${shMonthStart().slice(0,7)}"><button class="btn" onclick="shDistribute()">توزيع أرباح الشهر</button>
+    <select id="shlm" onchange="act(()=>rpc('shareholder_set_loss_mode',{p_mode:this.value}))"><option value="proportional" ${lossMode==='proportional'?'selected':''}>الخسارة بنفس النسبة</option><option value="carry_forward" ${lossMode==='carry_forward'?'selected':''}>ترحيل الخسارة للشهر الجاي</option></select></div>`:'';
+  const pendingHtml=shIsAdmin()&&pending.length?`<div class="card"><h3>طلبات تعديل بيانات مساهمين (تحتاج موافقتك)</h3>${T(['المساهم','التعديل المطلوب','التاريخ',''],pending.map(x=>[nameOf(S,x.shareholder_id)||'مساهم جديد',`<code>${e(JSON.stringify(x.changes))}</code>`,new Date(x.requested_at).toLocaleString('ar-EG'),`<button class="btn" onclick="shDecide('${x.id}',true)">موافقة</button> <button class="btn danger" onclick="shDecide('${x.id}',false)">رفض</button>`]))}</div>`:'';
+  const runsHtml=runs.length?T(['الشهر','صافي الربح','متوسط رأس المال','الحالة'],runs.map(r=>[e(String(r.month).slice(0,7)),money(r.net_profit),money(r.total_avg_capital),chip(r.status,r.status==='Distributed'?'success':r.status==='Carried'?'warning':'info')])):'<div class="empty">لا توجد توزيعات بعد</div>';
+  return `${sectionHead('المساهمون','رأس المال والأرباح الشهرية. تعديل البيانات من المحاسب بيحتاج موافقة الأدمن.')}
+  <div class="card form-card"><div class="row"><button class="btn" onclick="shEdit(null)">+ مساهم جديد</button></div>${adminTools}</div>
+  ${pendingHtml}
+  <div class="card">${S.length?T(['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي',''],rows):'<div class="empty">لا يوجد مساهمون بعد</div>'}</div>
+  <div class="card"><h3>توزيعات الأرباح</h3>${runsHtml}</div>`;
+}
+function nameOf(S,id){const s=S.find(x=>x.id===id);return s?e(s.name):''}
+async function shEdit(id){
+  const S=id?(await g('shareholders')).find(x=>x.id===id):null;
+  showModal(`<h3>${S?'تعديل بيانات مساهم':'مساهم جديد'}</h3>
+    <div class="row"><input id="shn" placeholder="الاسم" value="${e(S?.name||'')}"><input id="shp" placeholder="الموبايل" value="${e(S?.phone||'')}"></div>
+    <div class="row"><input id="she" placeholder="الإيميل" value="${e(S?.email||'')}"><select id="shm"><option value="reinvest" ${S?.profit_mode!=='withdraw'?'selected':''}>يضيف الربح لرأس المال</option><option value="withdraw" ${S?.profit_mode==='withdraw'?'selected':''}>يسحب الربح</option></select></div>
+    <p class="muted">${shIsAdmin()?'التعديل هيتطبق فوراً.':'التعديل هيتبعت للأدمن للموافقة.'}</p>`,
+    `<button class="btn" onclick="shSave('${id||''}')">حفظ</button>`);
+}
+async function shSave(id){const data={name:v('shn').trim(),phone:v('shp').trim(),email:v('she').trim(),profit_mode:v('shm')};closeModal();await act(()=>rpc('shareholder_save',{p_id:id||null,p_data:data}))}
+function shMoveForm(id){
+  showModal(`<h3>إيداع أو سحب من رأس المال</h3>
+    <div class="row"><select id="shtype"><option value="deposit">إيداع</option><option value="withdraw">سحب</option></select><input id="shamt" type="number" min="0" step="0.01" placeholder="المبلغ"></div>
+    <div class="row"><input id="shdate" type="date" value="${shToday()}"><input id="shnote" placeholder="ملاحظة"></div>`,
+    `<button class="btn" onclick="shMove('${id}')">تنفيذ</button>`);
+}
+async function shMove(id){const t=v('shtype'),amt=+v('shamt'),d=v('shdate'),n=v('shnote');closeModal();await act(()=>rpc('shareholder_capital_move',{p_shareholder:id,p_type:t,p_amount:amt,p_date:d,p_notes:n||null}))}
+function shPayForm(id){
+  showModal(`<h3>صرف ربح مستحق</h3>
+    <div class="row"><input id="shamt" type="number" min="0" step="0.01" placeholder="المبلغ"><input id="shdate" type="date" value="${shToday()}"></div>
+    <div class="row"><input id="shnote" placeholder="ملاحظة"></div>`,
+    `<button class="btn" onclick="shPay('${id}')">صرف</button>`);
+}
+async function shPay(id){const amt=+v('shamt'),d=v('shdate'),n=v('shnote');closeModal();await act(()=>rpc('shareholder_pay_profit',{p_shareholder:id,p_amount:amt,p_date:d,p_notes:n||null}))}
+async function shDistribute(){
+  const m=v('shdm');if(!m)return toast('اختار الشهر الأول');
+  const ok=confirm('هيتم توزيع أرباح/خسائر الشهر '+m+' على المساهمين وتسجيل القيود. متأكد؟');if(!ok)return;
+  await act(async()=>{const r=await rpc('shareholder_distribute_profit',{p_month:m+'-01'});if(r.status==='distributed')alert('تم التوزيع: صافي '+fmt(r.net)+' | تم إضافته لرأس المال '+fmt(r.reinvested)+' | مستحق للصرف '+fmt(r.payable)+' | خسارة '+fmt(r.loss));else if(r.status==='carried')alert('الخسارة اترحّلت للشهر الجاي');else alert('مفيش ربح ولا خسارة في الشهر ده')});
+}
+async function shDecide(id,ok){await act(()=>rpc('shareholder_decide_change',{p_request:id,p_approve:ok,p_notes:null}))}
+
 async function approvalView(){const L=await g('approval_requests','requested_at');return `${sectionHead('الاعتمادات','مراجعة واعتماد العمليات قبل ترحيلها أو حسب سياسة الشركة.')}<div class="card">${L.length?T(['العملية','الحالة','طالب الاعتماد','التاريخ','ملاحظات',''],L.map(x=>[e(x.entity),chip(x.status,x.status==='Approved'?'success':x.status==='Rejected'?'danger':'warning'),e(x.requested_by),new Date(x.requested_at).toLocaleString('ar-EG'),e(x.notes||''),x.status==='Pending'?`<button class="btn" onclick="act(()=>rpc('decide_approval',{p_request:'${x.id}',p_approve:true,p_notes:null}))">اعتماد</button> <button class="btn danger" onclick="act(()=>rpc('decide_approval',{p_request:'${x.id}',p_approve:false,p_notes:null}))">رفض</button>`:''])):'<div class="empty">لا توجد طلبات اعتماد</div>'}</div>`}
 
 async function taxdocView(){const L=await g('tax_documents','created_at');return `${sectionHead('المستندات الضريبية','حالة تجهيز وإرسال المستندات. التكامل الرسمي مع الجهة الضريبية يحتاج بيانات اعتماد/API حقيقية.')}<div class="card form-card"><div class="row"><select id="tdi">${(await g('sales_invoices','date')).filter(x=>x.status==='Posted').map(x=>`<option value="${x.id}">${e(x.number)}</option>`).join('')}</select><button class="btn" onclick="act(()=>rpc('register_tax_document',{p_invoice:v('tdi')}))">تسجيل مستند</button></div></div><div class="card">${T(['الفاتورة','الحالة','UUID الخارجي','Submission','آخر تحديث',''],L.map(x=>[e(x.invoice_id),chip(x.status,x.status==='Accepted'?'success':x.status==='Rejected'?'danger':'warning'),e(x.external_uuid||'—'),e(x.submission_id||'—'),new Date(x.updated_at).toLocaleString('ar-EG'),x.status==='Pending'?`<button class="btn soft" onclick="act(()=>rpc('update_tax_document',{p_doc:'${x.id}',p_status:'Submitted',p_external_uuid:null,p_submission_id:null,p_error:null}))">تحديث Submitted</button>`:'']))}</div>`}
@@ -738,7 +793,7 @@ async function paintView(q){
     else if(view==='asset')h=await assetView(); else if(view==='bank')h=await bankView(); else if(view==='price')h=await priceView();
     else if(view==='hr')h=await hrView(); else if(view==='mfg')h=await mfgView(); else if(view==='pos')h=await posView(); else if(view==='proj')h=await projView(); else if(view==='period')h=await periodView();
     else if(view==='trace')h=await traceView(); else if(view==='data')h=await dataView(); else if(view==='health')h=await healthView(); else if(view==='devset')h=await devSetView(); else if(view==='rep')h=await reportsView(); else if(view==='profit')h=await profitView(); else if(view==='bud')h=await budgetView(); else if(view==='jr')h=await accountsView(); else if(view==='users')h=await usersView();
-    else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else if(view==='cosettings')h=await coSettingsView(); else if(view==='printcfg')h=await printSettingsView(); else if(view==='fullbak')h=fullBakView(); else h=await legacyHtml();
+    else if(view==='shareholders')h=await shareholdersView(); else if(view==='appr')h=await approvalView(); else if(view==='chk')h=await chequeView(); else if(view==='comm')h=await commissionView(); else if(view==='taxdoc')h=await taxdocView(); else if(view==='int')h=await integrationsView(); else if(view==='org')h=await orgView(); else if(view==='whs')h=await warehousesView(); else if(view==='cosettings')h=await coSettingsView(); else if(view==='printcfg')h=await printSettingsView(); else if(view==='fullbak')h=fullBakView(); else h=await legacyHtml();
     if(!h)h='<div class="card">صفحة غير متاحة.</div>';
     if(view==='dash')h=quickBar()+h+'<div class="app-version">الإصدار '+APP_VERSION+'</div>';
     if(view!=='dash'){const back=(window._nav&&window._nav.length)?'<button class="btn s" onclick="goBack()">'+ico('back')+' رجوع</button>':'';h=`<div class="no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">${back}<button class="btn s" onclick="go('dash')">${ico('home')} الرئيسية</button></div>`+h}
@@ -753,7 +808,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.92';
+const APP_VERSION='v1.93';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
