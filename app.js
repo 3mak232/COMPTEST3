@@ -2287,7 +2287,7 @@ async function forceAppReload(t){
 }
 async function checkAppRefresh(){
   try{
-    const t=String(await rpc('app_refresh_token',{})||'');
+    const t=String(await rpc('app_version',{})||'');
     if(!t)return;
     let seen=null;try{seen=localStorage.getItem(APP_SEEN_KEY)}catch{}
     if(seen===null){try{localStorage.setItem(APP_SEEN_KEY,t)}catch{}return}
