@@ -860,7 +860,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.99';
+const APP_VERSION='v2.00';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
@@ -992,8 +992,8 @@ Object.assign(AU_ACT,{insert:'إضافة'});
 Object.assign(AU_ENT,{app_control:'إعدادات التحكم بالنظام',parties:'طرف (عميل/مورد)',attendance:'حضور',accounts:'حساب (دليل)',approval_requests:'طلب اعتماد',asset_categories:'تصنيف أصول',bank_statement_lines:'سطر كشف بنك',bank_statements:'كشف بنك',bom_items:'مكون تصنيع',boms:'وصفة تصنيع',branches:'فرع',cash_movements:'حركة خزينة',categories:'تصنيف',commission_rules:'قاعدة عمولة',cost_centers:'مركز تكلفة',delivery_note_items:'صنف إذن تسليم',goods_receipt_items:'صنف استلام',integration_connections:'اتصال تكامل',integration_events:'حدث تكامل',inventory_lot_balances:'رصيد دفعة مخزون',inventory_lots:'دفعة مخزون',inventory_serials:'رقم تسلسلي',journal_lines:'سطر قيد',leave_requests:'طلب إجازة',leave_types:'نوع إجازة',notifications:'إشعار',payment_allocations:'توزيع دفعة',pos_session_sales:'مبيعات جلسة كاشير',pos_sessions:'جلسة كاشير',price_list_items:'صنف قائمة أسعار',price_lists:'قائمة أسعار',product_barcodes:'باركود',projects:'مشروع',purchase_invoice_items:'صنف فاتورة شراء',purchase_order_items:'صنف أمر شراء',purchase_return_items:'صنف مرتجع شراء',quotation_items:'صنف عرض سعر',sales_commissions:'عمولة مبيعات',sales_invoice_items:'صنف فاتورة بيع',sales_order_items:'صنف أمر بيع',sales_return_items:'صنف مرتجع بيع',service_tickets:'تذكرة خدمة',shifts:'وردية',stock_movements:'حركة مخزون',stock_transfer_items:'صنف تحويل مخزني',stocktake_items:'صنف جرد',tax_documents:'مستند ضريبي',units:'وحدة قياس',user_quick_actions:'اختصار مستخدم',audit_logs:'سجل العمليات'});
 const auDesc=x=>{const d=x.description||'';const m=d.match(/^DB trigger: (\w+) on (\w+)/);if(!m)return d;const pre={INSERT:'إضافة سجل في ',UPDATE:'تعديل سجل في ',DELETE:'حذف سجل من '}[m[1]]||'';return pre+(AU_ENT[m[2]]||m[2])};
 
-// ----- تسجيل خروج تلقائي بعد 5 دقايق خمول (v1.63) -----
-const IDLE_MS=5*60*1000;let _idleT=null;
+// ----- تسجيل خروج تلقائي بعد ساعة خمول (v1.63، الوقت اتغير لساعة) -----
+const IDLE_MS=60*60*1000;let _idleT=null;
 function resetIdle(){
   clearTimeout(_idleT);
   _idleT=setTimeout(async()=>{
