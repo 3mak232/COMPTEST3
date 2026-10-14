@@ -554,12 +554,30 @@ async function shareholdersView(){
   const reqHtml=(pendingHtml+myHtml)||'<div class="empty">لا توجد طلبات</div>';
   const reqCount=isAdm?pending.length:mine.length;
   const listHtml=S.length?T(['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي',''],rows):'<div class="empty">لا يوجد مساهمون بعد</div>';
-  window._shReqHtml=reqHtml; window._shListHtml=listHtml; window._shData={S,M,avgBy,runs,PN}; window._shRows=rows; window._shHeaders=['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي','']; window._shSearch=S.map(x=>`${x.name||''} ${x.phone||''} ${x.email||''}`.toLowerCase());
+  window._shReqHtml=reqHtml; window._shReqData={R,S,PN,isAdm,meId:me?.id}; window._shListHtml=listHtml; window._shData={S,M,avgBy,runs,PN}; window._shRows=rows; window._shHeaders=['الاسم','الموبايل','طريقة الربح','رأس المال الحالي','المستحق للصرف','متوسط الشهر الحالي','']; window._shSearch=S.map(x=>`${x.name||''} ${x.phone||''} ${x.email||''}`.toLowerCase());
   return `${sectionHead('المساهمون','رأس المال والأرباح الشهرية. تعديل البيانات من المحاسب بيحتاج موافقة الأدمن.')}
   <div class="card form-card"><div class="row"><button class="btn" onclick="shEdit(null)">+ إضافة مساهم</button><button class="btn soft" onclick="shShowRequests()">الطلبات (${reqCount})</button><button class="btn soft" onclick="shShowList()">المساهمون الحاليون (${S.length})</button><button class="btn soft" onclick="shPrintMembers()">طباعة بيانات المساهمين</button><button class="btn soft" onclick="shPrintDistributions()">طباعة توزيعات الأرباح</button></div>${adminTools}</div>
   <div class="card"><h3>توزيعات الأرباح</h3>${runsHtml}</div>`;
 }
-function shShowRequests(){showModal(`<h3>طلبات التعديل</h3>${window._shReqHtml||''}`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>')}
+function shReqTab(t){window._shReqTab=t;shShowRequests()}
+function shShowRequests(){
+  const d=window._shReqData||{R:[],S:[],PN:{},isAdm:false,meId:null};
+  const scoped=d.R.filter(x=>d.isAdm||x.requested_by===d.meId);
+  const tab=window._shReqTab||'Pending';
+  const cnt=k=>k==='all'?scoped.length:scoped.filter(x=>x.status===k).length;
+  const tabs=[['Pending','قيد الانتظار'],['Approved','موافق عليه'],['Rejected','مرفوض'],['all','الكل']];
+  const tabsHtml=tabs.map(([k,l])=>`<button class="btn ${tab===k?'':'soft'}" onclick="shReqTab('${k}')">${l} (${cnt(k)})</button>`).join('');
+  const list=scoped.filter(x=>tab==='all'||x.status===tab);
+  const nameOfReq=x=>x.shareholder_id?e(d.S.find(s=>s.id===x.shareholder_id)?.name||'—'):e(x.changes?.name||'مساهم جديد');
+  const body=list.length?T(['المساهم','التعديل المطلوب','طلب من','التاريخ','الحالة'],list.map(x=>[
+    nameOfReq(x),
+    shChangeHtml(x.changes),
+    d.PN[x.requested_by]||'—',
+    new Date(x.requested_at).toLocaleString('ar-EG'),
+    shStatusChip(x.status)+(d.isAdm&&x.status==='Pending'?` <button class="btn" onclick="shDecide('${x.id}',true)">موافقة</button> <button class="btn danger" onclick="shDecide('${x.id}',false)">رفض</button>`:'')
+  ])):'<div class="empty">لا توجد طلبات في هذا القسم</div>';
+  showModal(`<h3>طلبات تعديل المساهمين</h3><div class="row" style="margin-bottom:10px">${tabsHtml}</div><div>${body}</div>`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>',true);
+}
 function shShowList(){showModal(`<h3>المساهمون الحاليون</h3><input id="shq" type="search" placeholder="بحث بالاسم أو الموبايل أو الإيميل" oninput="shFilterList()" style="width:100%;margin:6px 0 10px"><div id="shListBody">${window._shListHtml||''}</div>`,'<button class="btn soft" onclick="closeModal()">إغلاق</button>',true)}
 function shFilterList(){
   const q=(v('shq')||'').trim().toLowerCase();
@@ -842,7 +860,7 @@ async function paintView(q){
 }
 const QA_ALL=[['sales','فاتورة بيع'],['purch','فاتورة شراء'],['cash','الخزينة والتحويلات'],['cust','عميل جديد'],['prod','منتج جديد'],['stk','الجرد'],['hr','الحضور والإجازات'],['rep','التقارير']];
 const QA_DEFAULT=['sales','purch','cash','cust','rep'];
-const APP_VERSION='v1.98';
+const APP_VERSION='v1.99';
 async function loadQuick(){try{const{data}=await sb.from('user_quick_actions').select('actions').eq('user_id',me.id).maybeSingle();window._qa=(data&&Array.isArray(data.actions)&&data.actions.length)?data.actions:QA_DEFAULT}catch(_){window._qa=QA_DEFAULT}}
 function quickBar(){
   const cur=window._qa||QA_DEFAULT;
